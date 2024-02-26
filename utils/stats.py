@@ -1,7 +1,6 @@
 import numpy as np
 from hurst import compute_Hc
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
-from hurst import compute_Hc
 
 def time_series_half_life(ts):
     """ 

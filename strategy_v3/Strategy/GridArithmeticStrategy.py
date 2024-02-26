@@ -127,6 +127,31 @@ class GridArithmeticStrategy(StrategyPerformance):
         df['hurst_exponent_avg'] = df["hurst_exponent"].rolling(self.vol_lookback).mean().shift(shift)
         df['Close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(shift)        
 
+        # compute rolling metrics based on time-series half-life
+        vol_hl = []
+        close_hl = []
+
+        close = df['Close'].values        
+        half_life = df['half_life'].values
+
+        for i in range(len(close)):            
+            if not math.isnan(half_life[i]):
+                # we want to calculate the average of one complete mean-reversion cycle, so we lookback half-life * 2
+                lookback = round(half_life[i]) * 2
+                close_ = close[max(i-lookback+1, 0):i+1]
+                close_mean = np.mean(close_)
+                std = np.std(close_)
+            else:
+                close_mean = std = math.nan
+                
+            close_hl.append(close_mean)       
+            vol_hl.append(std)
+
+        df['Close_sma_hl'] = close_hl     
+        df['Close_sma_hl'] = df['Close_sma_hl'].shift(shift)
+        df['Vol_hl'] = vol_hl
+        df['Vol_hl'] = df['Vol_hl'].shift(shift)
+
         # remove all null data
         df = df[~df['Vol'].isnull()]
         df = df[~df['half_life'].isnull()]
