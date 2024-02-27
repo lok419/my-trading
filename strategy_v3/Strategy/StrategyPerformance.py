@@ -186,6 +186,11 @@ class StrategyPerformance(object):
             grid_orders['grid_start_period'] = grid_orders['time'].dt.round('15min')
 
             for _, temp in grid_orders.groupby(['grid_id', 'grid_start_period']):            
+
+                # if nothing got filled, then skip it (this is usually the momentum orders)
+                if len(temp[temp['status'] == 'FILLED']) == 0:
+                    continue
+
                 grid_min_dt = temp['updateTime'].min()
                 grid_max_dt = temp['updateTime'].max()    
                 grid_prices = sorted(temp[temp['type'] == 'LIMIT']['price'].values)

@@ -16,7 +16,12 @@ import re
 class Status(Enum):
     IDLE = 1
     ACTIVE = 2
-    NEUTRAL = 3    
+    NEUTRAL = 3
+
+class TS_PROP(Enum):
+    RANDOM = 0
+    MEAN_REVERT = 1
+    MOMENTUM = 2
 
 class GridArithmeticStrategyv2(StrategyPerformance):
 
@@ -28,7 +33,8 @@ class GridArithmeticStrategyv2(StrategyPerformance):
                  vol_grid_scale: float = 1,
                  vol_stoploss_scale: float = 7,
                  position_size: float = 100,
-                 hurst_exp_threshold: float = 0.5,
+                 hurst_exp_mr_threshold: float = 0.5,
+                 hurst_exp_mo_threshold: float = float('inf'),
                  verbose: bool = True
         ):
         '''
@@ -49,7 +55,8 @@ class GridArithmeticStrategyv2(StrategyPerformance):
         self.vol_grid_scale = vol_grid_scale
         self.vol_stoploss_scale = vol_stoploss_scale
         self.position_size = position_size
-        self.hurst_exp_threshold = hurst_exp_threshold
+        self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
+        self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
 
         self.grid_id = 0        
         self.stoploss = (float('-inf'), float('inf'))
@@ -125,6 +132,9 @@ class GridArithmeticStrategyv2(StrategyPerformance):
         df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(shift)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(shift)
         df['hurst_exponent_avg'] = df["hurst_exponent"].rolling(self.vol_lookback).mean().shift(shift)
+        df['Close_t5'] = df['Close'].shift(5)
+        df['Close_t10'] = df['Close'].shift(10)
+        df['Close_t20'] = df['Close'].shift(20)
         df['Close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(shift)        
 
         # compute rolling metrics based on time-series half-life
@@ -173,7 +183,7 @@ class GridArithmeticStrategyv2(StrategyPerformance):
         date = data['Date']
         hurst_exponent = data['hurst_exponent']
         open, close, high, low = data['Open'], data['Close'], data['High'], data['Low']            
-        vol = data['Vol']
+        vol = data['Vol']        
 
         if vol is None or math.isnan(vol):
             self.logger.error('historical volatility is null. exit.'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
@@ -184,14 +194,15 @@ class GridArithmeticStrategyv2(StrategyPerformance):
             return        
         
         status = self.get_status()
+        ts_prop = self.get_ts_prop(data)
+
+        self.logger.info('state: {}, ts_prop: {}, hurst_exponent is {:.2f}.'.format(status.name, ts_prop.name, hurst_exponent))
 
         # At beginning of periods, use open price to create grid orders                
-        if status == Status.IDLE and hurst_exponent < self.hurst_exp_threshold:
-            center_px = self.derive_grid_center_px(data)      
-            self.place_grid_order(center_px, vol, date)
-        else:       
-            pass_str = 'below' if hurst_exponent < self.hurst_exp_threshold else 'above'
-            self.logger.info('state: {}, hurst_exponent is {:.2f} ({} threshold {:.2f}).'.format(status.name, hurst_exponent, pass_str, self.hurst_exp_threshold))
+        if status == Status.IDLE and ts_prop != TS_PROP.RANDOM:            
+            center_px = self.derive_grid_center_px(data, ts_prop)                  
+            if center_px is not None:
+                self.place_grid_order(center_px, vol, ts_prop, date)
 
         '''
             Only used for backtest - fill the orders using high and low            
@@ -223,6 +234,15 @@ class GridArithmeticStrategyv2(StrategyPerformance):
             return Status.NEUTRAL
         else:
             return Status.ACTIVE
+        
+    def get_ts_prop(self, data: dict) -> TS_PROP:
+        hurst_exponent = data['hurst_exponent']
+        if hurst_exponent < self.hurst_exp_mr_threshold:
+            return TS_PROP.MEAN_REVERT        
+        elif hurst_exponent > self.hurst_exp_mo_threshold:
+            return TS_PROP.MOMENTUM        
+        else:
+            return TS_PROP.RANDOM
 
     def is_idle(self) -> bool:
         '''
@@ -315,27 +335,50 @@ class GridArithmeticStrategyv2(StrategyPerformance):
 
     def derive_grid_center_px(
             self,
-            data: DataFrame,            
+            data: DataFrame,   
+            ts_prop: TS_PROP,         
         ) -> float:
         '''
             Calculate the grid center price
-            data:   the input data to execute()
+                - for mean reverting, we use current price as grid center price
+                - for momentum, we use a current price +- x * vol * vol_grid_scale to follow the price momentum.
+                  meanwhile, there is also a extra momentum filter to make sure there is short-term momentum
+                
+            data:       the input data to execute()
+            ts_prop     price-series property
         '''
-        center_px = data['Open'] if self.is_backtest() else data['Close']
+        current_px = data['Open'] if self.is_backtest() else data['Close']
+        current_vol = data['Vol']
+
+        if ts_prop == TS_PROP.MEAN_REVERT:
+            center_px = current_px
+
+        elif ts_prop == TS_PROP.MOMENTUM:       
+            if current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:
+                center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale
+            elif current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:
+                center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
+            else:
+                center_px = None
+        else:
+            center_px = None
+
         return center_px
 
     def place_grid_order(
             self,            
             center_px:float,
             current_vol:float,
-            date:datetime, 
+            ts_prop: TS_PROP,
+            date:datetime,             
         ):
         '''
             Generate Grid Orders based on current price. Meanwhile also return StopLoss for the Grid
             current_px:     neutral price, center of the grids
             current_vol:    the historical volatiltiy used to determine the grid spacing
+            ts_prop:        current price time-series porperties (only used for logging)
             date:           only used for backtest
-        '''
+        '''        
         grid_scales = list(range(-self.grid_size,self.grid_size+1,1))        
         grid_prices = [center_px + x * current_vol * self.vol_grid_scale for x in grid_scales]
         stoploss = (center_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale, center_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale)
@@ -346,7 +389,7 @@ class GridArithmeticStrategyv2(StrategyPerformance):
         # grid quantity
         quantity = self.position_size / center_px
         quantity = round(quantity, self.qty_decimal)
-        self.logger.info('creating {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, quantity, self.instrument, round(center_px, self.price_decimal)))
+        self.logger.info('creating {} {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, ts_prop.name, quantity, self.instrument, round(center_px, self.price_decimal)))
         
         for i, px in enumerate(grid_prices):
             if grid_scales[i] == 0:
