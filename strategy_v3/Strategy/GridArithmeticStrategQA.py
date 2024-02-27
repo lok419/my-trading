@@ -23,7 +23,7 @@ class TS_PROP(Enum):
     MEAN_REVERT = 1
     MOMENTUM = 2
 
-class GridArithmeticStrategyv2(StrategyPerformance):
+class GridArithmeticStrategyQA(StrategyPerformance):
 
     def __init__(self, 
                  instrument:str, 
@@ -195,8 +195,7 @@ class GridArithmeticStrategyv2(StrategyPerformance):
         
         status = self.get_status()
         ts_prop = self.get_ts_prop(data)
-
-        self.logger.info('state: {}, ts_prop: {}, hurst_exponent is {:.2f}.'.format(status.name, ts_prop.name, hurst_exponent))
+        self.logger.info('state: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(status.name, ts_prop.name, hurst_exponent))
 
         # At beginning of periods, use open price to create grid orders                
         if status == Status.IDLE and ts_prop != TS_PROP.RANDOM:            

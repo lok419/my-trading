@@ -18,8 +18,9 @@ if __name__ == '__main__':
         vol_lookback = 30,
         vol_grid_scale = 0.2,
         vol_stoploss_scale = 7,
-        position_size = 300,
-        hurst_exp_threshold = 0.5
+        position_size = 500,
+        hurst_exp_mr_threshold = 0.5,
+        hurst_exp_mo_threshold = 0.6,
     )
 
     strategy.set_price_decimal(2)

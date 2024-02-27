@@ -1,3 +1,3 @@
 from .StrategyPerformance import StrategyPerformance
 from .GridArithmeticStrategy import GridArithmeticStrategy
-from .GridArithmeticStrategv2 import GridArithmeticStrategyv2
+from .GridArithmeticStrategQA import GridArithmeticStrategyQA
