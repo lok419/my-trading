@@ -162,3 +162,4 @@ cython_debug/
 /utils/credentials.py
 *.h5
 *.csv
+*.pl
