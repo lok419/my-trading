@@ -156,7 +156,7 @@ class Binance(AccountModel):
         '''
             All all orders from Binance
         '''
-        orders = self.client.get_all_orders(symbol=instrument)                
+        orders = self.client.get_all_orders(symbol=instrument, limit=1000)                
         orders = pd.DataFrame(orders)
 
         if len(orders) == 0:
