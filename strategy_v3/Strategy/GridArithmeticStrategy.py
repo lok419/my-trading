@@ -23,6 +23,12 @@ class TS_PROP(Enum):
     MEAN_REVERT = 1
     MOMENTUM = 2
 
+class GRID_TYPE(Enum):
+    MEAN_REVERT = 0
+    MOMENTUM_UP = 1
+    MOMENTUM_DOWN = 2
+
+
 class GridArithmeticStrategy(StrategyPerformance):
 
     def __init__(self, 
@@ -203,9 +209,9 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         # At beginning of periods, use open price to create grid orders                
         if status == Status.IDLE and ts_prop != TS_PROP.RANDOM:            
-            center_px, stoploss = self.derive_grid_center_px(data, ts_prop)                  
+            center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)                  
             if center_px is not None and stoploss is not None:
-                self.place_grid_order(center_px, vol, ts_prop, date)
+                self.place_grid_order(center_px, vol, grid_type, date)
                 self.stoploss = stoploss
 
         '''
@@ -350,7 +356,7 @@ class GridArithmeticStrategy(StrategyPerformance):
             self,
             data: DataFrame,   
             ts_prop: TS_PROP,         
-        ) -> tuple[float, tuple]:
+        ) -> tuple[float, tuple, GRID_TYPE]:
         '''
             Calculate the grid center price
                 - for mean reverting, we use current price as grid center price
@@ -361,32 +367,35 @@ class GridArithmeticStrategy(StrategyPerformance):
             ts_prop     price-series property
         '''
         current_px = data['Open'] if self.is_backtest() else data['Close']
-        current_vol = data['Vol']
+        current_vol = data['Vol']        
 
         if ts_prop == TS_PROP.MEAN_REVERT:
             center_px = current_px
             stoploss = (current_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale, current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale)
+            grid_type = GRID_TYPE.MEAN_REVERT
 
         elif ts_prop == TS_PROP.MOMENTUM:       
             if current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:
                 center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale
                 stoploss = (current_px - 2 * self.vol_stoploss_scale * current_vol * self.vol_grid_scale, float('inf'))
+                grid_type = GRID_TYPE.MOMENTUM_UP
 
             elif current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:
                 center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
                 stoploss = (float('-inf'), current_px + 2 * self.vol_stoploss_scale * current_vol * self.vol_grid_scale)                
+                grid_type = GRID_TYPE.MOMENTUM_DOWN
             else:
-                center_px = stoploss = None
+                center_px = stoploss = grid_type = None
         else:
-            center_px = stoploss = None
+            center_px = stoploss = grid_type = None
 
-        return center_px, stoploss
+        return center_px, stoploss, grid_type
 
     def place_grid_order(
             self,            
             center_px:float,
             current_vol:float,
-            ts_prop: TS_PROP,
+            grid_type: GRID_TYPE,
             date:datetime,             
         ):
         '''
@@ -405,7 +414,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         # grid quantity
         quantity = self.position_size / center_px
         quantity = round(quantity, self.qty_decimal)
-        self.logger.info('creating {} {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, ts_prop.name, quantity, self.instrument, round(center_px, self.price_decimal)))
+        self.logger.info('creating {} {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, grid_type.name, quantity, self.instrument, round(center_px, self.price_decimal)))
         
         for i, px in enumerate(grid_prices):
             if grid_scales[i] == 0:
@@ -438,7 +447,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         df_orders['grid_id'] = df_orders['clientOrderId'].apply(lambda x: int(re.search(r"(?<=gridid)\d+(?=_)", x)[0]))
 
         # find the grid trade type (grid/stoploss/close)
-        df_orders['grid_type'] = df_orders['clientOrderId'].apply(lambda x: x.split('_')[-1]).apply(lambda x: re.sub(r'[0-9]', '', x))        
+        df_orders['grid_tt'] = df_orders['clientOrderId'].apply(lambda x: x.split('_')[-1]).apply(lambda x: re.sub(r'[0-9]', '', x))        
 
         '''
             Binance API does not show fill price for market orders, we need to fill it ourselves. 

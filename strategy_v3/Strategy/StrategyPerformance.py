@@ -133,9 +133,13 @@ class StrategyPerformance(object):
         perf = pd.DataFrame({'Measure': measures, self.__str__(): list(perf.values())})  
         return perf
 
-    def summary(self, plot_orders:bool=False):
+    def summary(self, 
+                plot_orders:bool=False, 
+                lastn: int=-1):
         '''
             Summary the performance given the load periods
+            plot_orders:    if plot orders on the graphs
+            lastn:          only plot last n grid orders
         '''
         df = self.df
         df_orders = self.get_all_orders()
@@ -178,12 +182,12 @@ class StrategyPerformance(object):
 
         if plot_orders:
 
-            grid_orders = df_orders[df_orders['grid_type'] == 'grid']
+            grid_orders = df_orders[df_orders['grid_tt'] == 'grid']
 
             # Sometime the grid id could be duplicated because the strategy (same id) is re-init such that the grid_id resets to 1
             # We need a way to distinguish they are different grids, so we use 15-mins rounded time to group the grid orders together (grid_id + rounded time).
             # This is because we believe all grids orders must be placed immediately and they must fall within the same 15-mins interval
-            grid_orders['grid_start_period'] = grid_orders['time'].dt.round('15min')
+            grid_orders['grid_start_period'] = grid_orders['time'].dt.round('15min')            
 
             for _, temp in grid_orders.groupby(['grid_id', 'grid_start_period']):            
 
@@ -204,12 +208,12 @@ class StrategyPerformance(object):
                     fig.add_shape(type='line', x0=grid_min_dt, x1=grid_max_dt, y0=grid, y1=grid, line=dict(color=color, dash='dash'), row=1, col=1)
                     
             # grid orders 
-            filled_grid_orders = df_orders[(df_orders['status'] == 'FILLED')&(df_orders['grid_type'] == 'grid')]
+            filled_grid_orders = df_orders[(df_orders['status'] == 'FILLED')&(df_orders['grid_tt'] == 'grid')]
             filled_grid_buy = filled_grid_orders[filled_grid_orders['side'] == 'BUY']
             filled_grid_sell = filled_grid_orders[filled_grid_orders['side'] == 'SELL']
 
             # close orders 
-            filled_close_orders = df_orders[(df_orders['status'] == 'FILLED')&(df_orders['grid_type'] != 'grid')]
+            filled_close_orders = df_orders[(df_orders['status'] == 'FILLED')&(df_orders['grid_tt'] != 'grid')]
             filled_close_buy = filled_close_orders[filled_close_orders['side'] == 'BUY']
             filled_close_sell = filled_close_orders[filled_close_orders['side'] == 'SELL']
 
