@@ -425,15 +425,17 @@ class GridArithmeticStrategy(StrategyPerformance):
         '''               
 
         grid_type_char = self.grid_type_to_char[grid_type.name]
-        grid_scales = list(range(-self.grid_size,self.grid_size+1,1))        
-        grid_prices = [center_px + x * current_vol * self.vol_grid_scale for x in grid_scales]       
+        grid_scales = list(range(-self.grid_size,self.grid_size+1,1))      
+        grid_space = current_vol * self.vol_grid_scale
+
+        grid_prices = [center_px + x * grid_space for x in grid_scales]       
         self.grid_id += 1     
         self.grid_type = grid_type
 
         # grid quantity
         quantity = self.position_size / center_px
         quantity = round(quantity, self.qty_decimal)                
-        self.logger.info('creating {} {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, grid_type.name, quantity, self.instrument, round(center_px, self.price_decimal)))
+        self.logger.info('creating {} {} grid orders of {} {} at grid center price {} with grid space {}....'.format(self.grid_size * 2, grid_type.name, quantity, self.instrument, round(center_px, self.price_decimal), round(grid_space, self.price_decimal)))
         
         for i, px in enumerate(grid_prices):
             if grid_scales[i] == 0:

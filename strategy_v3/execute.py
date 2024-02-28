@@ -41,7 +41,7 @@ if __name__ == '__main__':
                 since_last = (dt_now - data['Date']).seconds
                 assert since_last <= interval
                 strategy.execute(data)        
-                sleep(30)
+                sleep(60)
             except Timeout as e:
                 strategy.logger.error(e)        
                 strategy.logger.error('handled explicitly. retring....')        
@@ -49,11 +49,13 @@ if __name__ == '__main__':
     except KeyboardInterrupt as e:        
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
-        strategy.close_out_positions()                               
+        strategy.close_out_positions()
+
     except Exception as e:
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
-        strategy.close_out_positions()    
+        strategy.close_out_positions()  
+
     finally:        
-        with open('objects/{}_{}.pl'.format(str(strategy), dt_now.strftime('%Y%m%d')), 'wb') as file:
+        with open('strategy_v3/objects/{}_{}.pl'.format(str(strategy), dt_now.strftime('%Y%m%d')), 'wb') as file:
             pickle.dump(strategy, file)
