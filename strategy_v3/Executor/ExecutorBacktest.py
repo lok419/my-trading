@@ -4,11 +4,12 @@ from datetime import datetime
 from pandas.core.frame import DataFrame
 import pandas as pd
 import numpy as np
+import math
 
 class ExecutorBacktest(ExecutorModel):
 
     def __init__(self):        
-        self.orders = pd.DataFrame(columns=['symbol', 'clientOrderId', 'price', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId'])
+        self.orders = pd.DataFrame(columns=['symbol', 'clientOrderId', 'price', 'fill_price', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId'])
         self.order_counter = 0
 
     def set_logger(self, logger):
@@ -28,10 +29,13 @@ class ExecutorBacktest(ExecutorModel):
         # Assume we execute at whatever price for market orders        
         status = 'FILLED' if order_type == 'MARKET' else 'NEW'
         executedQty = quantity if order_type == 'MARKET' else 0
+        fill_price = price if order_type == 'MARKET' else math.nan
+
         order_dict = {
             'symbol': instrument,
             'clientOrderId': order_id,
             'price': price,
+            'fill_price': fill_price,
             'origQty': quantity,
             'executedQty': executedQty,
             'status': status,
@@ -49,7 +53,7 @@ class ExecutorBacktest(ExecutorModel):
         order_id = df_orders['orderId'].values
         self.orders['status'] = np.where(self.orders['orderId'].isin(order_id), 'CANCELED', self.orders['status'])        
         
-    def get_all_orders(self, instrument:str) -> DataFrame:
+    def get_all_orders(self, instrument:str, **params) -> DataFrame:
         df_orders = self.orders[self.orders['symbol'] == instrument]        
         df_orders['NetExecutedQty'] = np.where(df_orders['side'] == 'BUY', 1, -1) * df_orders['executedQty']
         return df_orders
@@ -73,6 +77,7 @@ class ExecutorBacktest(ExecutorModel):
         self.orders['status'] = np.where(fill_filters, 'FILLED', self.orders['status'])
         self.orders['executedQty'] = np.where(fill_filters, self.orders['origQty'], self.orders['executedQty'])
         self.orders['updateTime'] = pd.to_datetime(np.where(fill_filters, date, self.orders['updateTime']))    
+        self.orders['fill_price'] = np.where(fill_filters, self.orders['price'], self.orders['fill_price'])
 
     def add_trading_fee(self, instrument:str, df_orders: DataFrame) -> DataFrame:
         '''

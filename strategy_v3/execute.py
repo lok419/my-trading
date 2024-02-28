@@ -7,6 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
 from requests.exceptions import Timeout
+import pickle
 
 warnings.filterwarnings('ignore')
 
@@ -45,10 +46,14 @@ if __name__ == '__main__':
                 strategy.logger.error(e)        
                 strategy.logger.error('handled explicitly. retring....')        
 
-    except KeyboardInterrupt:
-        # if we interrupt manully, do nothing
-        pass                
+    except KeyboardInterrupt as e:        
+        strategy.logger.error(e)        
+        strategy.cancel_all_orders()
+        strategy.close_out_positions()                               
     except Exception as e:
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
         strategy.close_out_positions()    
+    finally:        
+        with open('objects/{}_{}.pl'.format(str(strategy), dt_now.strftime('%Y%m%d')), 'wb') as file:
+            pickle.dump(strategy, file)

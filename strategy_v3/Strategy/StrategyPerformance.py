@@ -32,7 +32,7 @@ class StrategyPerformance(object):
         open_sell = []
 
         for _, row in orders.iterrows():
-            date, side, qty, price, grid_id = row['updateTime'], row['side'], row['executedQty'], row['price'], row['grid_id']
+            date, side, qty, price, grid_id = row['updateTime'], row['side'], row['executedQty'], row['fill_price'], row['grid_id']
             opposite_side, same_side = (open_sell, open_buy) if side == 'BUY' else (open_buy, open_sell)            
 
             # we have nothing to net
@@ -48,9 +48,9 @@ class StrategyPerformance(object):
                 qty -= netted_qty
 
                 if side == 'BUY':
-                    netted_pnl += netted_qty * (opposite_side[0]['price'] - price)            
+                    netted_pnl += netted_qty * (opposite_side[0]['fill_price'] - price)            
                 else:
-                    netted_pnl += netted_qty * (price - opposite_side[0]['price'])                            
+                    netted_pnl += netted_qty * (price - opposite_side[0]['fill_price'])                            
                 
                 # pop the trade if this is completely netted
                 if opposite_side[0]['executedQty'] == 0:
@@ -72,10 +72,10 @@ class StrategyPerformance(object):
 
         # for all open positions, use close px
         for row in open_buy:
-            pnl.append((close_dt, row['executedQty'] * (close_px - row['price']), row['grid_id']))
+            pnl.append((close_dt, row['executedQty'] * (close_px - row['fill_price']), row['grid_id']))
 
         for row in open_sell:
-            pnl.append((close_dt, row['executedQty'] * (row['price'] - close_px), row['grid_id']))
+            pnl.append((close_dt, row['executedQty'] * (row['fill_price'] - close_px), row['grid_id']))
         
         df_pnl = pd.DataFrame(pnl, columns=['Date', 'pnl_gross', 'grid_id'])       
         # in case of no data, we need to cast column 'Date' to datetime64
@@ -101,7 +101,7 @@ class StrategyPerformance(object):
         df_pnl['trading_fee_cum'] = df_pnl['trading_fee'].cumsum()        
 
         # sanity check by re-calculating the pnl in different ways - net cash flow + net positon value
-        gross_pnl1 = (-1 * orders['NetExecutedQty'] * orders['price']).sum() + orders['NetExecutedQty'].sum() * close_px
+        gross_pnl1 = (-1 * orders['NetExecutedQty'] * orders['fill_price']).sum() + orders['NetExecutedQty'].sum() * close_px
         gross_pnl2 = df_pnl['pnl_gross'].sum()
         diff = abs(gross_pnl1 - gross_pnl2)        
 
@@ -142,7 +142,7 @@ class StrategyPerformance(object):
             lastn:          only plot last n grid orders
         '''
         df = self.df
-        df_orders = self.get_all_orders()
+        df_orders = self.get_all_orders(query_all=True, trade_details=True)
         df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
         df_orders = df_orders[df_orders['updateTime'] >= df['Date'].min()]
         df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max()]        
@@ -197,6 +197,8 @@ class StrategyPerformance(object):
 
                 grid_min_dt = temp['updateTime'].min()
                 grid_max_dt = temp['updateTime'].max()    
+
+                # when we draw the grid line, use the order price instead of fill price
                 grid_prices = sorted(temp[temp['type'] == 'LIMIT']['price'].values)
 
                 for i, grid in enumerate(grid_prices):                    
@@ -217,10 +219,10 @@ class StrategyPerformance(object):
             filled_close_buy = filled_close_orders[filled_close_orders['side'] == 'BUY']
             filled_close_sell = filled_close_orders[filled_close_orders['side'] == 'SELL']
 
-            fig.add_trace(go.Scatter(x=filled_grid_buy['updateTime'], y=filled_grid_buy['price'], marker=dict(color='green',size=15), mode='markers', marker_symbol=5, name='Buy'),row=1, col=1)
-            fig.add_trace(go.Scatter(x=filled_grid_sell['updateTime'], y=filled_grid_sell['price'], marker=dict(color='red',size=15), mode='markers', marker_symbol=6, name='Sell'),row=1, col=1)
-            fig.add_trace(go.Scatter(x=filled_close_buy['updateTime'], y=filled_close_buy['price'], marker=dict(color='green',size=15), mode='markers', marker_symbol='x', name='Buy to Close'),row=1, col=1)
-            fig.add_trace(go.Scatter(x=filled_close_sell['updateTime'], y=filled_close_sell['price'], marker=dict(color='red',size=15), mode='markers', marker_symbol='x', name='Sell to Close'),row=1, col=1)
+            fig.add_trace(go.Scatter(x=filled_grid_buy['updateTime'], y=filled_grid_buy['fill_price'], marker=dict(color='green',size=15), mode='markers', marker_symbol=5, name='Buy'),row=1, col=1)
+            fig.add_trace(go.Scatter(x=filled_grid_sell['updateTime'], y=filled_grid_sell['fill_price'], marker=dict(color='red',size=15), mode='markers', marker_symbol=6, name='Sell'),row=1, col=1)
+            fig.add_trace(go.Scatter(x=filled_close_buy['updateTime'], y=filled_close_buy['fill_price'], marker=dict(color='green',size=15), mode='markers', marker_symbol='x', name='Buy to Close'),row=1, col=1)
+            fig.add_trace(go.Scatter(x=filled_close_sell['updateTime'], y=filled_close_sell['fill_price'], marker=dict(color='red',size=15), mode='markers', marker_symbol='x', name='Sell to Close'),row=1, col=1)
 
         # Net PnL
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_cum"]*100, name='Cumulative Return (%)'), row=2, col=1)

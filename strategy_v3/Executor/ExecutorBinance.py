@@ -45,8 +45,8 @@ class ExecutorBinance(ExecutorModel):
         for id in order_id:
             self.binance.cancel_order(instrument, id)        
         
-    def get_all_orders(self, instrument:str):        
-        df_orders = self.binance.get_all_orders(instrument)                        
+    def get_all_orders(self, instrument:str, **params):        
+        df_orders = self.binance.get_all_orders(instrument, **params)                        
         df_orders['NetExecutedQty'] = np.where(df_orders['side'] == 'BUY', 1, -1) * df_orders['executedQty']
         return df_orders
     

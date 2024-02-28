@@ -436,11 +436,17 @@ class GridArithmeticStrategy(StrategyPerformance):
                 order_id=order_id_
             )        
 
-    def get_all_orders(self) -> DataFrame:
+    def get_all_orders(self, 
+                       query_all: bool = False,
+                       trade_details: bool = False,                       
+                       ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
+
+            query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
+            trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
         '''
-        df_orders = self.executor.get_all_orders(self.instrument)
+        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
 
         # find the grid_id of orders
@@ -453,15 +459,15 @@ class GridArithmeticStrategy(StrategyPerformance):
             Binance API does not show fill price for market orders, we need to fill it ourselves. 
             We round to nearest interval and take the open price as market price
         '''
-        if type(self.executor) is ExecutorBinance and len(df_orders):
-            mkt_orders = df_orders[df_orders['type'] == 'MARKET']
-            df_orders = df_orders[df_orders['type'] != 'MARKET']
+        # if type(self.executor) is ExecutorBinance and len(df_orders):
+        #     mkt_orders = df_orders[df_orders['type'] == 'MARKET']
+        #     df_orders = df_orders[df_orders['type'] != 'MARKET']
             
-            mkt_orders['Date'] = mkt_orders['updateTime'].dt.round(self.interval_round)            
-            mkt_orders = pd.merge(mkt_orders, self.df[['Date', 'Open']], how='left', validate='m:1')
-            mkt_orders['price'] = np.where(mkt_orders['price'] > 0, mkt_orders['price'], mkt_orders['Open'])
-            mkt_orders = mkt_orders.drop(columns=['Open', 'Date'])
-            df_orders = pd.concat([df_orders, mkt_orders])            
+        #     mkt_orders['Date'] = mkt_orders['updateTime'].dt.round(self.interval_round)            
+        #     mkt_orders = pd.merge(mkt_orders, self.df[['Date', 'Open']], how='left', validate='m:1')
+        #     mkt_orders['price'] = np.where(mkt_orders['price'] > 0, mkt_orders['price'], mkt_orders['Open'])
+        #     mkt_orders = mkt_orders.drop(columns=['Open', 'Date'])
+        #     df_orders = pd.concat([df_orders, mkt_orders])            
 
         return df_orders
     
