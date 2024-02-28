@@ -1,7 +1,7 @@
 from strategy_v3.Executor import ExecutorBinance, ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
 from strategy_v3.Strategy import StrategyPerformance
-from datetime import datetime, timezone
+from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
 from utils.logging import get_logger
 from pandas.core.frame import DataFrame
@@ -64,7 +64,10 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
 
-        self.grid_id = 0        
+        # this saves the current grid stats
+        self.grid_id = 0
+        self.grid_type = None
+
         self.stoploss = (float('-inf'), float('inf'))
         self.executor = None
         self.data_loader = None
@@ -83,6 +86,10 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         self.execute_start_time = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
         self.start_date = None
+
+        # grid type name acronym map
+        self.grid_char_to_type = {''.join([s[0] for s in x.split('_')]): x for x in GRID_TYPE._member_names_}
+        self.grid_type_to_char = {x: ''.join([s[0] for s in x.split('_')]) for x in GRID_TYPE._member_names_}
 
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
@@ -105,12 +112,21 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.data_loader = data_loader
 
     def set_price_decimal(self, price_decimal:int):
+        '''
+            set price rounding decimal
+        '''
         self.price_decimal = price_decimal
 
     def set_qty_decimal(self, qty_decimal:int):
+        '''
+            set qty rounding decimal
+        '''
         self.qty_decimal = qty_decimal
 
     def set_strategy_id(self, id:str):
+        '''
+            set strategy id. this is used to identify the orders from same strategy instance
+        '''
         self.strategy_id = id
         self.logger.name = self.__str__()    
 
@@ -118,17 +134,14 @@ class GridArithmeticStrategy(StrategyPerformance):
         return type(self.executor) is ExecutorBacktest
     
     def get_current_time(self) -> datetime:
-        return pd.to_datetime(datetime.now(timezone.utc)).replace(tzinfo=None)
+        return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
 
     def load_data(self, lookback):
         df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)        
 
         # need at least 100 data points to determine the hurst exponent ratio
         assert len(df) > min(100, self.vol_lookback)
-
-        # preprocess all data. These data are using close price, so we need to shift by 1
-        #df['Vol'] = df['Close'].diff().rolling(self.vol_lookback).std().shift(1)
-
+        
         '''
             for backtest, we cannot use close price for the same interval as this implies lookahead bias
             for actual trading, we can use the close price which represents the latest price within the same interval
@@ -336,7 +349,8 @@ class GridArithmeticStrategy(StrategyPerformance):
             if price is not None:
                 price = round(price, self.price_decimal)
 
-            order_id = f'{self.__str__()}_gridid{self.grid_id}_{type}'
+            grid_type_char = self.grid_type_to_char[self.grid_type.name]                        
+            order_id = f'{self.__str__()}_gridid{self.grid_id}_{grid_type_char}_{type}'
             side = 'BUY' if filled_net_qty < 0 else 'SELL'
             quantity = abs(filled_net_qty)
             self.executor.place_order(
@@ -404,24 +418,25 @@ class GridArithmeticStrategy(StrategyPerformance):
             current_vol:    the historical volatiltiy used to determine the grid spacing
             ts_prop:        current price time-series porperties (only used for logging)
             date:           only used for backtest
-        '''        
+        '''               
+
+        grid_type_char = self.grid_type_to_char[grid_type.name]
         grid_scales = list(range(-self.grid_size,self.grid_size+1,1))        
         grid_prices = [center_px + x * current_vol * self.vol_grid_scale for x in grid_scales]       
-
-        self.grid_id += 1
-        order_id = f'{self.__str__()}_gridid{self.grid_id}_grid'
+        self.grid_id += 1     
+        self.grid_type = grid_type
 
         # grid quantity
         quantity = self.position_size / center_px
-        quantity = round(quantity, self.qty_decimal)
+        quantity = round(quantity, self.qty_decimal)                
         self.logger.info('creating {} {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, grid_type.name, quantity, self.instrument, round(center_px, self.price_decimal)))
         
         for i, px in enumerate(grid_prices):
             if grid_scales[i] == 0:
                 continue
 
-            side = 'SELL' if grid_scales[i] > 0 else 'BUY'            
-            order_id_ = order_id + str(i)     
+            side = 'SELL' if grid_scales[i] > 0 else 'BUY'  
+            order_id = f'{self.__str__()}_gridid{self.grid_id}_{grid_type_char}_grid{i}'            
             px = round(px, self.price_decimal)             
 
             # place grid orders
@@ -433,7 +448,7 @@ class GridArithmeticStrategy(StrategyPerformance):
                 quantity=quantity,
                 price=px, 
                 date=date,          # only used for backtest      
-                order_id=order_id_
+                order_id=order_id
             )        
 
     def get_all_orders(self, 
@@ -454,6 +469,16 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         # find the grid trade type (grid/stoploss/close)
         df_orders['grid_tt'] = df_orders['clientOrderId'].apply(lambda x: x.split('_')[-1]).apply(lambda x: re.sub(r'[0-9]', '', x))        
+
+        # find the grid type (MR/MU/MD)        
+        def grid_type_find(x):
+            try:
+                grid_type = re.search(r"gridid\d+_\w\w_grid\d+", x)[0].split('_')[1]
+                grid_type = self.grid_char_to_type[grid_type]
+                return grid_type
+            except:
+                return ''              
+        df_orders['grid_type'] = df_orders['clientOrderId'].apply(grid_type_find)     
 
         '''
             Binance API does not show fill price for market orders, we need to fill it ourselves. 
