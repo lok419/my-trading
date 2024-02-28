@@ -152,9 +152,10 @@ class GridArithmeticStrategy(StrategyPerformance):
         df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(shift)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(shift)
         df['hurst_exponent_avg'] = df["hurst_exponent"].rolling(self.vol_lookback).mean().shift(shift)
-        df['Close_t5'] = df['Close'].shift(5)
-        df['Close_t10'] = df['Close'].shift(10)
-        df['Close_t20'] = df['Close'].shift(20)
+
+        df[['Close_t5', 'Low_t5', 'High_t5']] = df[['Close', 'Low', 'High']].shift(5)
+        df[['Close_t10', 'Low_t10', 'High_t10']] = df[['Close', 'Low', 'High']].shift(10)
+        df[['Close_t20', 'Low_t20', 'High_t20']] = df[['Close', 'Low', 'High']].shift(20)              
         df['Close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(shift)        
 
         # set start date based on loaded data
@@ -388,13 +389,16 @@ class GridArithmeticStrategy(StrategyPerformance):
             stoploss = (current_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale, current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale)
             grid_type = GRID_TYPE.MEAN_REVERT
 
-        elif ts_prop == TS_PROP.MOMENTUM:       
-            if current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:
+        elif ts_prop == TS_PROP.MOMENTUM:    
+            # conservative approach on momentum filters
+            if current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:
+            #if current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:
                 center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale
                 stoploss = (current_px - 2 * self.vol_stoploss_scale * current_vol * self.vol_grid_scale, float('inf'))
                 grid_type = GRID_TYPE.MOMENTUM_UP
 
-            elif current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:
+            elif current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:
+            #elif current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:
                 center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
                 stoploss = (float('-inf'), current_px + 2 * self.vol_stoploss_scale * current_vol * self.vol_grid_scale)                
                 grid_type = GRID_TYPE.MOMENTUM_DOWN
