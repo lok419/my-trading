@@ -500,7 +500,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         # find the grid type (MR/MU/MD)        
         def grid_type_find(x):
             try:
-                grid_type = re.search(r"gridid\d+_\w\w_grid\d+", x)[0].split('_')[1]
+                grid_type = re.search(r"gridid\d+_\w\w_\w+", x)[0].split('_')[1]
                 grid_type = self.grid_char_to_type[grid_type]
                 return grid_type
             except:

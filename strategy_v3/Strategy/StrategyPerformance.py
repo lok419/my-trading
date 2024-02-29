@@ -2,6 +2,7 @@ from plotly.subplots import make_subplots
 from pandas.core.frame import DataFrame
 from utils.performance import get_latest_risk_free_rate, maximum_drawdown
 from utils.data_helper import title_case
+from strategy_v3.Strategy import GRID_TYPE
 import plotly.graph_objects as go
 import plotly
 import pandas as pd
@@ -148,6 +149,9 @@ class StrategyPerformance(object):
         df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max()]        
 
         df_pnl = self.compute_pnl(df_orders)        
+        df_pnl_mr = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MEAN_REVERT.name])        
+        df_pnl_mu = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_UP.name])        
+        df_pnl_md = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_DOWN.name])        
         df_pnl_metric = self.compute_pnl_metrics(df_pnl)
 
         # just save the data to object property
@@ -231,8 +235,19 @@ class StrategyPerformance(object):
 
         # Net PnL
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_cum"]*100, name='Cumulative Return (%)'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["return_cum"]*100, name='Cumulative Return (%) - Mean Revert', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["return_cum"]*100, name='Cumulative Return (%) - Momentum Up', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["return_cum"]*100, name='Cumulative Return (%) - Momentum Down', visible='legendonly'), row=2, col=1)
+
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_cum"], name='Cumulative PnL (Fiat)', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["pnl_cum"], name='Cumulative PnL (Fiat) - Mean Revert', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["pnl_cum"], name='Cumulative PnL (Fiat) - Momentum Up', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["pnl_cum"], name='Cumulative PnL (Fiat) - Momentum Down', visible='legendonly'), row=2, col=1)
+
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl"], name='PnL (Fiat)', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["pnl"], name='PnL (Fiat) - Mean Revert', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["pnl"], name='PnL (Fiat) - Momentum Up', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["pnl"], name='PnL (Fiat) - Momentum Down', visible='legendonly'), row=2, col=1)
 
         # Gross PnL                
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_gross_cum"]*100, name='Cumulative Gross Return (%)', visible='legendonly'), row=2, col=1)
