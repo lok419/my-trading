@@ -1,6 +1,6 @@
 from strategy_v3.Executor import ExecutorBinance, ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
-from strategy_v3.Strategy import StrategyPerformance
+from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, Status
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
 from utils.logging import get_logger
@@ -12,22 +12,6 @@ import numpy as np
 import random
 import math
 import re
-
-class Status(Enum):
-    IDLE = 1
-    ACTIVE = 2
-    NEUTRAL = 3
-
-class TS_PROP(Enum):
-    RANDOM = 0
-    MEAN_REVERT = 1
-    MOMENTUM = 2
-
-class GRID_TYPE(Enum):
-    MEAN_REVERT = 0
-    MOMENTUM_UP = 1
-    MOMENTUM_DOWN = 2
-
 
 class GridArithmeticStrategy(StrategyPerformance):
 

@@ -54,8 +54,4 @@ if __name__ == '__main__':
     except Exception as e:
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
-        strategy.close_out_positions()  
-
-    finally:        
-        with open('strategy_v3/objects/{}_{}.pl'.format(str(strategy), dt_now.strftime('%Y%m%d')), 'wb') as file:
-            pickle.dump(strategy, file)
+        strategy.close_out_positions()

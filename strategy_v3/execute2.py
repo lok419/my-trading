@@ -28,7 +28,7 @@ if __name__ == '__main__':
     strategy.set_qty_decimal(2)
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
-    strategy.set_strategy_id('v1')
+    strategy.set_strategy_id('SOLFDUSDv1')
     
     try:
         while True:    
@@ -55,7 +55,3 @@ if __name__ == '__main__':
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
         strategy.close_out_positions()  
-
-    finally:        
-        with open('strategy_v3/objects/{}_{}.pl'.format(str(strategy), dt_now.strftime('%Y%m%d')), 'wb') as file:
-            pickle.dump(strategy, file)

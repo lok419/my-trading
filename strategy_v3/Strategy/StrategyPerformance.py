@@ -2,12 +2,13 @@ from plotly.subplots import make_subplots
 from pandas.core.frame import DataFrame
 from utils.performance import get_latest_risk_free_rate, maximum_drawdown
 from utils.data_helper import title_case
+from IPython.display import display
 from strategy_v3.Strategy import GRID_TYPE
 import plotly.graph_objects as go
 import plotly
 import pandas as pd
 import numpy as np
-from IPython.display import display
+
 
 '''
     This is an extension class which consolidates all the pnl or performance related functions (e.g. plots, netting pnl)
@@ -155,6 +156,7 @@ class StrategyPerformance(object):
         df_pnl_metric = self.compute_pnl_metrics(df_pnl)
 
         # just save the data to object property
+        self.df_orders = df_orders
         self.df_pnl = df_pnl
         self.df_pnl_metric  = df_pnl_metric
 
