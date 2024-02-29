@@ -4,6 +4,7 @@ from utils.performance import get_latest_risk_free_rate, maximum_drawdown
 from utils.data_helper import title_case
 from IPython.display import display
 from strategy_v3.Strategy import GRID_TYPE
+from datetime import timedelta
 import plotly.graph_objects as go
 import plotly
 import pandas as pd
@@ -147,7 +148,7 @@ class StrategyPerformance(object):
         df_orders = self.get_all_orders(query_all=True, trade_details=True)
         df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
         df_orders = df_orders[df_orders['updateTime'] >= df['Date'].min()]
-        df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max()]        
+        df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max() + timedelta(minutes=self.interval_min)]        
 
         df_pnl = self.compute_pnl(df_orders)        
         df_pnl_mr = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MEAN_REVERT.name])        

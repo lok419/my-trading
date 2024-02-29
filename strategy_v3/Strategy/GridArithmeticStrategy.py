@@ -65,6 +65,8 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         # 5m -> 5mins for round function
         self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
+        self.interval_min = int(self.interval.replace('m', ''))
+
         if not verbose:
             self.logger.setLevel('CRITICAL')
 
