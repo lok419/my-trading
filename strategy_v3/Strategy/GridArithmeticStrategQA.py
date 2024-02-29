@@ -1,7 +1,7 @@
 from strategy_v3.Executor import ExecutorBinance, ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
-from strategy_v3.Strategy import StrategyPerformance
-from datetime import datetime, timezone
+from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, Status
+from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
 from utils.logging import get_logger
 from pandas.core.frame import DataFrame
@@ -12,16 +12,6 @@ import numpy as np
 import random
 import math
 import re
-
-class Status(Enum):
-    IDLE = 1
-    ACTIVE = 2
-    NEUTRAL = 3
-
-class TS_PROP(Enum):
-    RANDOM = 0
-    MEAN_REVERT = 1
-    MOMENTUM = 2
 
 class GridArithmeticStrategyQA(StrategyPerformance):
 
@@ -58,7 +48,10 @@ class GridArithmeticStrategyQA(StrategyPerformance):
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
 
-        self.grid_id = 0        
+        # this saves the current grid stats
+        self.grid_id = 0
+        self.grid_type = None
+
         self.stoploss = (float('-inf'), float('inf'))
         self.executor = None
         self.data_loader = None
@@ -76,6 +69,11 @@ class GridArithmeticStrategyQA(StrategyPerformance):
             self.logger.setLevel('CRITICAL')
 
         self.execute_start_time = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
+        self.start_date = None
+
+        # grid type name acronym map
+        self.grid_char_to_type = {''.join([s[0] for s in x.split('_')]): x for x in GRID_TYPE._member_names_}
+        self.grid_type_to_char = {x: ''.join([s[0] for s in x.split('_')]) for x in GRID_TYPE._member_names_}
 
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
@@ -98,12 +96,21 @@ class GridArithmeticStrategyQA(StrategyPerformance):
         self.data_loader = data_loader
 
     def set_price_decimal(self, price_decimal:int):
+        '''
+            set price rounding decimal
+        '''
         self.price_decimal = price_decimal
 
     def set_qty_decimal(self, qty_decimal:int):
+        '''
+            set qty rounding decimal
+        '''
         self.qty_decimal = qty_decimal
 
     def set_strategy_id(self, id:str):
+        '''
+            set strategy id. this is used to identify the orders from same strategy instance
+        '''
         self.strategy_id = id
         self.logger.name = self.__str__()    
 
@@ -111,17 +118,14 @@ class GridArithmeticStrategyQA(StrategyPerformance):
         return type(self.executor) is ExecutorBacktest
     
     def get_current_time(self) -> datetime:
-        return pd.to_datetime(datetime.now(timezone.utc)).replace(tzinfo=None)
+        return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
 
     def load_data(self, lookback):
         df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)        
 
         # need at least 100 data points to determine the hurst exponent ratio
         assert len(df) > min(100, self.vol_lookback)
-
-        # preprocess all data. These data are using close price, so we need to shift by 1
-        #df['Vol'] = df['Close'].diff().rolling(self.vol_lookback).std().shift(1)
-
+        
         '''
             for backtest, we cannot use close price for the same interval as this implies lookahead bias
             for actual trading, we can use the close price which represents the latest price within the same interval
@@ -132,10 +136,14 @@ class GridArithmeticStrategyQA(StrategyPerformance):
         df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(shift)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(shift)
         df['hurst_exponent_avg'] = df["hurst_exponent"].rolling(self.vol_lookback).mean().shift(shift)
-        df['Close_t5'] = df['Close'].shift(5)
-        df['Close_t10'] = df['Close'].shift(10)
-        df['Close_t20'] = df['Close'].shift(20)
+
+        df[['Close_t5', 'Low_t5', 'High_t5']] = df[['Close', 'Low', 'High']].shift(5)
+        df[['Close_t10', 'Low_t10', 'High_t10']] = df[['Close', 'Low', 'High']].shift(10)
+        df[['Close_t20', 'Low_t20', 'High_t20']] = df[['Close', 'Low', 'High']].shift(20)              
         df['Close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(shift)        
+
+        # set start date based on loaded data
+        self.start_date = df['Date'].min()
 
         # compute rolling metrics based on time-series half-life
         vol_hl = []
@@ -199,9 +207,13 @@ class GridArithmeticStrategyQA(StrategyPerformance):
 
         # At beginning of periods, use open price to create grid orders                
         if status == Status.IDLE and ts_prop != TS_PROP.RANDOM:            
-            center_px = self.derive_grid_center_px(data, ts_prop)                  
-            if center_px is not None:
-                self.place_grid_order(center_px, vol, ts_prop, date)
+            center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
+            current_vol = vol
+            current_px = open if self.is_backtest() else close
+
+            if center_px is not None and stoploss is not None:
+                self.place_grid_order(center_px, current_px, current_vol, grid_type, date)
+                self.stoploss = stoploss
 
         '''
             Only used for backtest - fill the orders using high and low            
@@ -276,7 +288,7 @@ class GridArithmeticStrategyQA(StrategyPerformance):
         if not self.is_backtest():              
             all_orders = all_orders[all_orders['time'] > self.execute_start_time]
 
-        last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]        
+        last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]
 
         pending = last_grid.copy()        
         pending = pending[pending['status'] != 'FILLED']
@@ -304,9 +316,18 @@ class GridArithmeticStrategyQA(StrategyPerformance):
             date:  only used for backtest
         '''
         date = date if date is not None else self.get_current_time()
-        all_orders = self.get_all_orders()            
+        all_orders = self.get_all_orders()    
 
-        filled = all_orders[all_orders['status'] == 'FILLED']        
+        if not self.is_backtest():              
+            all_orders = all_orders[all_orders['time'] > self.execute_start_time]        
+        
+        '''
+            Only check with last grid, we assume all previous grid are flatted
+            Binance API has 1000 orders limit, it could be cases that some of the filled orders got truncated and lead to wrong net position from last 1000 orders
+        '''
+        last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]  
+        filled = last_grid[last_grid['status'] == 'FILLED']
+
         filled_net_qty = filled['NetExecutedQty'].sum()   
         filled_net_qty = round(filled_net_qty, self.qty_decimal)
 
@@ -316,7 +337,8 @@ class GridArithmeticStrategyQA(StrategyPerformance):
             if price is not None:
                 price = round(price, self.price_decimal)
 
-            order_id = f'{self.__str__()}_gridid{self.grid_id}_{type}'
+            grid_type_char = self.grid_type_to_char[self.grid_type.name]                        
+            order_id = f'{self.__str__()}_gridid{self.grid_id}_{grid_type_char}_{type}'
             side = 'BUY' if filled_net_qty < 0 else 'SELL'
             quantity = abs(filled_net_qty)
             self.executor.place_order(
@@ -328,6 +350,7 @@ class GridArithmeticStrategyQA(StrategyPerformance):
                 date=date, 
                 order_id=order_id,
                 price=price,
+                stopPrice=None,
             )
         else:
             self.logger.info('nothing to close out because of no oustanding positions....'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
@@ -336,7 +359,7 @@ class GridArithmeticStrategyQA(StrategyPerformance):
             self,
             data: DataFrame,   
             ts_prop: TS_PROP,         
-        ) -> float:
+        ) -> tuple[float, tuple, GRID_TYPE]:
         '''
             Calculate the grid center price
                 - for mean reverting, we use current price as grid center price
@@ -347,28 +370,39 @@ class GridArithmeticStrategyQA(StrategyPerformance):
             ts_prop     price-series property
         '''
         current_px = data['Open'] if self.is_backtest() else data['Close']
-        current_vol = data['Vol']
+        current_vol = data['Vol']        
 
         if ts_prop == TS_PROP.MEAN_REVERT:
             center_px = current_px
+            stoploss = (current_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale, current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale)
+            grid_type = GRID_TYPE.MEAN_REVERT
 
-        elif ts_prop == TS_PROP.MOMENTUM:       
-            if current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:
+        elif ts_prop == TS_PROP.MOMENTUM:    
+            # conservative approach on momentum filters
+            if current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:
+            #if current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:
                 center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale
-            elif current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:
-                center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
-            else:
-                center_px = None
-        else:
-            center_px = None
+                stoploss = (current_px - 2 * self.vol_stoploss_scale * current_vol * self.vol_grid_scale, float('inf'))
+                grid_type = GRID_TYPE.MOMENTUM_UP
 
-        return center_px
+            elif current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:
+            #elif current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:
+                center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
+                stoploss = (float('-inf'), current_px + 2 * self.vol_stoploss_scale * current_vol * self.vol_grid_scale)                
+                grid_type = GRID_TYPE.MOMENTUM_DOWN
+            else:
+                center_px = stoploss = grid_type = None
+        else:
+            center_px = stoploss = grid_type = None
+
+        return center_px, stoploss, grid_type
 
     def place_grid_order(
             self,            
             center_px:float,
+            current_px: float,
             current_vol:float,
-            ts_prop: TS_PROP,
+            grid_type: GRID_TYPE,
             date:datetime,             
         ):
         '''
@@ -377,67 +411,99 @@ class GridArithmeticStrategyQA(StrategyPerformance):
             current_vol:    the historical volatiltiy used to determine the grid spacing
             ts_prop:        current price time-series porperties (only used for logging)
             date:           only used for backtest
-        '''        
-        grid_scales = list(range(-self.grid_size,self.grid_size+1,1))        
-        grid_prices = [center_px + x * current_vol * self.vol_grid_scale for x in grid_scales]
-        stoploss = (center_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale, center_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale)
+        '''               
 
-        self.grid_id += 1
-        order_id = f'{self.__str__()}_gridid{self.grid_id}_grid'
+        grid_type_char = self.grid_type_to_char[grid_type.name]
+        grid_scales = list(range(-self.grid_size,self.grid_size+1,1))      
+        grid_space = current_vol * self.vol_grid_scale
+
+        grid_prices = [center_px + x * grid_space for x in grid_scales]       
+        self.grid_id += 1     
+        self.grid_type = grid_type
 
         # grid quantity
         quantity = self.position_size / center_px
-        quantity = round(quantity, self.qty_decimal)
-        self.logger.info('creating {} {} grid orders of {} {} at grid center price {}....'.format(self.grid_size * 2, ts_prop.name, quantity, self.instrument, round(center_px, self.price_decimal)))
+        quantity = round(quantity, self.qty_decimal)                
+        self.logger.info('creating {} {} grid orders of {} {} at grid center price {} with grid space {}....'.format(self.grid_size * 2, grid_type.name, quantity, self.instrument, round(center_px, self.price_decimal), round(grid_space, self.price_decimal)))
         
         for i, px in enumerate(grid_prices):
             if grid_scales[i] == 0:
                 continue
 
-            side = 'SELL' if grid_scales[i] > 0 else 'BUY'            
-            order_id_ = order_id + str(i)     
-            px = round(px, self.price_decimal)             
+            side = 'SELL' if grid_scales[i] > 0 else 'BUY'  
+            order_id = f'{self.__str__()}_gridid{self.grid_id}_{grid_type_char}_grid{i}'            
+            px = round(px, self.price_decimal)
 
-            # place grid orders
+            stopPrice = None
+            order_type = 'LIMIT'
+
+            '''
+                for MOMENTUM UP grid orders, we need to use STOP_LOSS_LIMIT buy orders so that it won't trigger the LIMIT order immediately.
+                for MOMENTUM DOWN grid orders, we need to use STOP_LOSS_LIMIT sell orders so that it won't trigger the LIMIT order immediately.            
+            '''            
+            if grid_type == GRID_TYPE.MOMENTUM_UP and side == 'BUY' and px > current_px:
+                order_type = 'STOP_LOSS_LIMIT'
+                stopPrice = px
+
+            elif grid_type == GRID_TYPE.MOMENTUM_DOWN and side == 'SELL' and px < current_px:
+                order_type = 'STOP_LOSS_LIMIT'
+                stopPrice = px                        
+
+            # place grid orders            
             self.executor.place_order(
                 instrument=self.instrument,
                 side=side,
-                order_type='LIMIT',
+                order_type=order_type,
                 timeInForce='GTC',
                 quantity=quantity,
                 price=px, 
+                stopPrice=stopPrice,
                 date=date,          # only used for backtest      
-                order_id=order_id_
-            )
+                order_id=order_id
+            )             
 
-        self.stoploss = stoploss
-
-    def get_all_orders(self) -> DataFrame:
+    def get_all_orders(self, 
+                       query_all: bool = False,
+                       trade_details: bool = False,                       
+                       ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
+
+            query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
+            trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
         '''
-        df_orders = self.executor.get_all_orders(self.instrument)
+        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
 
         # find the grid_id of orders
         df_orders['grid_id'] = df_orders['clientOrderId'].apply(lambda x: int(re.search(r"(?<=gridid)\d+(?=_)", x)[0]))
 
         # find the grid trade type (grid/stoploss/close)
-        df_orders['grid_type'] = df_orders['clientOrderId'].apply(lambda x: x.split('_')[-1]).apply(lambda x: re.sub(r'[0-9]', '', x))        
+        df_orders['grid_tt'] = df_orders['clientOrderId'].apply(lambda x: x.split('_')[-1]).apply(lambda x: re.sub(r'[0-9]', '', x))        
+
+        # find the grid type (MR/MU/MD)        
+        def grid_type_find(x):
+            try:
+                grid_type = re.search(r"gridid\d+_\w\w_\w+", x)[0].split('_')[1]
+                grid_type = self.grid_char_to_type[grid_type]
+                return grid_type
+            except:
+                return ''              
+        df_orders['grid_type'] = df_orders['clientOrderId'].apply(grid_type_find)     
 
         '''
             Binance API does not show fill price for market orders, we need to fill it ourselves. 
             We round to nearest interval and take the open price as market price
         '''
-        if type(self.executor) is ExecutorBinance and len(df_orders):
-            mkt_orders = df_orders[df_orders['type'] == 'MARKET']
-            df_orders = df_orders[df_orders['type'] != 'MARKET']
+        # if type(self.executor) is ExecutorBinance and len(df_orders):
+        #     mkt_orders = df_orders[df_orders['type'] == 'MARKET']
+        #     df_orders = df_orders[df_orders['type'] != 'MARKET']
             
-            mkt_orders['Date'] = mkt_orders['updateTime'].dt.round(self.interval_round)            
-            mkt_orders = pd.merge(mkt_orders, self.df[['Date', 'Open']], how='left', validate='m:1')
-            mkt_orders['price'] = np.where(mkt_orders['price'] > 0, mkt_orders['price'], mkt_orders['Open'])
-            mkt_orders = mkt_orders.drop(columns=['Open', 'Date'])
-            df_orders = pd.concat([df_orders, mkt_orders])            
+        #     mkt_orders['Date'] = mkt_orders['updateTime'].dt.round(self.interval_round)            
+        #     mkt_orders = pd.merge(mkt_orders, self.df[['Date', 'Open']], how='left', validate='m:1')
+        #     mkt_orders['price'] = np.where(mkt_orders['price'] > 0, mkt_orders['price'], mkt_orders['Open'])
+        #     mkt_orders = mkt_orders.drop(columns=['Open', 'Date'])
+        #     df_orders = pd.concat([df_orders, mkt_orders])            
 
         return df_orders
     
