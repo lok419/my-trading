@@ -135,11 +135,11 @@ class StrategyPerformance(object):
 
     def summary(self, 
                 plot_orders:bool=False, 
-                lastn: int=-1):
+                lastn: int=20):
         '''
             Summary the performance given the load periods
             plot_orders:    if plot orders on the graphs
-            lastn:          only plot last n grid orders
+            lastn:          only plot last n grid orders lines
         '''
         df = self.df
         df_orders = self.get_all_orders(query_all=True, trade_details=True)
@@ -187,7 +187,12 @@ class StrategyPerformance(object):
             # Sometime the grid id could be duplicated because the strategy (same id) is re-init such that the grid_id resets to 1
             # We need a way to distinguish they are different grids, so we use 15-mins rounded time to group the grid orders together (grid_id + rounded time).
             # This is because we believe all grids orders must be placed immediately and they must fall within the same 15-mins interval
-            grid_orders['grid_start_period'] = grid_orders['time'].dt.round('15min')            
+            grid_orders['grid_start_period'] = grid_orders['time'].dt.round('15min')    
+
+            if lastn > 0:
+                top_grid_orders = grid_orders.drop_duplicates(['grid_id', 'grid_start_period'])[['grid_id', 'grid_start_period']]
+                top_grid_orders = top_grid_orders.sort_values(['grid_start_period', 'grid_id']).tail(lastn)
+                grid_orders = pd.merge(grid_orders, top_grid_orders, how='inner', on=['grid_start_period', 'grid_id'], validate='m:1')
 
             for _, temp in grid_orders.groupby(['grid_id', 'grid_start_period']):            
 
