@@ -9,7 +9,7 @@ import math
 class ExecutorBacktest(ExecutorModel):
 
     def __init__(self):        
-        self.orders = pd.DataFrame(columns=['symbol', 'clientOrderId', 'price', 'fill_price', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId'])
+        self.orders = pd.DataFrame(columns=['symbol', 'clientOrderId', 'price', 'fill_price', 'stopPrice', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId'])
         self.order_counter = 0
 
     def set_logger(self, logger):
@@ -22,6 +22,7 @@ class ExecutorBacktest(ExecutorModel):
                     timeInForce:str,
                     quantity:float,
                     price:float,
+                    stopPrice: float,
                     order_id:str,
                     date:datetime,
                     ):
@@ -35,6 +36,7 @@ class ExecutorBacktest(ExecutorModel):
             'symbol': instrument,
             'clientOrderId': order_id,
             'price': price,
+            'stopPrice': stopPrice,
             'fill_price': fill_price,
             'origQty': quantity,
             'executedQty': executedQty,
@@ -49,11 +51,16 @@ class ExecutorBacktest(ExecutorModel):
         self.order_counter += 1
         self.orders = pd.concat([self.orders, pd.DataFrame([order_dict])])    
 
-    def cancel_order(self, instrument:str, df_orders:DataFrame):
+    def cancel_order(self, 
+                     instrument:str, 
+                     df_orders:DataFrame):
+        
         order_id = df_orders['orderId'].values
         self.orders['status'] = np.where(self.orders['orderId'].isin(order_id), 'CANCELED', self.orders['status'])        
         
-    def get_all_orders(self, instrument:str, **params) -> DataFrame:
+    def get_all_orders(self, 
+                       instrument:str, 
+                       **params) -> DataFrame:
         df_orders = self.orders[self.orders['symbol'] == instrument]        
         df_orders['NetExecutedQty'] = np.where(df_orders['side'] == 'BUY', 1, -1) * df_orders['executedQty']
         return df_orders
@@ -92,7 +99,7 @@ class ExecutorBacktest(ExecutorModel):
         fees = Binance().get_trading_fee(instrument=instrument).iloc[0]
         marker_fee = fees['makerCommission']
         taker_fee = fees['takerCommission']
-        df_orders['trading_fee'] = np.where(df_orders['type'] == 'LIMIT', marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['price']
+        df_orders['trading_fee'] = np.where(df_orders['type'].str.contains('LIMIT'), marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['price']
         df_orders['trading_fee'] = np.where(df_orders['status'] == 'FILLED', df_orders['trading_fee'], 0)
         df_orders['trading_fee'] = df_orders['trading_fee'].astype(float)
 

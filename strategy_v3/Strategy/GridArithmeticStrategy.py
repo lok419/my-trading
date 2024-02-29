@@ -223,9 +223,12 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         # At beginning of periods, use open price to create grid orders                
         if status == Status.IDLE and ts_prop != TS_PROP.RANDOM:            
-            center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)                  
+            center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
+            current_vol = vol
+            current_px = open if self.is_backtest() else close
+
             if center_px is not None and stoploss is not None:
-                self.place_grid_order(center_px, vol, grid_type, date)
+                self.place_grid_order(center_px, current_px, current_vol, grid_type, date)
                 self.stoploss = stoploss
 
         '''
@@ -363,6 +366,7 @@ class GridArithmeticStrategy(StrategyPerformance):
                 date=date, 
                 order_id=order_id,
                 price=price,
+                stopPrice=None,
             )
         else:
             self.logger.info('nothing to close out because of no oustanding positions....'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
@@ -412,6 +416,7 @@ class GridArithmeticStrategy(StrategyPerformance):
     def place_grid_order(
             self,            
             center_px:float,
+            current_px: float,
             current_vol:float,
             grid_type: GRID_TYPE,
             date:datetime,             
@@ -443,19 +448,35 @@ class GridArithmeticStrategy(StrategyPerformance):
 
             side = 'SELL' if grid_scales[i] > 0 else 'BUY'  
             order_id = f'{self.__str__()}_gridid{self.grid_id}_{grid_type_char}_grid{i}'            
-            px = round(px, self.price_decimal)             
+            px = round(px, self.price_decimal)
 
-            # place grid orders
+            stopPrice = None
+            order_type = 'LIMIT'
+
+            '''
+                for MOMENTUM UP grid orders, we need to use STOP_LOSS_LIMIT buy orders so that it won't trigger the LIMIT order immediately.
+                for MOMENTUM DOWN grid orders, we need to use STOP_LOSS_LIMIT sell orders so that it won't trigger the LIMIT order immediately.            
+            '''            
+            if grid_type == GRID_TYPE.MOMENTUM_UP and side == 'BUY' and px > current_px:
+                order_type = 'STOP_LOSS_LIMIT'
+                stopPrice = px
+
+            elif grid_type == GRID_TYPE.MOMENTUM_DOWN and side == 'SELL' and px < current_px:
+                order_type = 'STOP_LOSS_LIMIT'
+                stopPrice = px                        
+
+            # place grid orders            
             self.executor.place_order(
                 instrument=self.instrument,
                 side=side,
-                order_type='LIMIT',
+                order_type=order_type,
                 timeInForce='GTC',
                 quantity=quantity,
                 price=px, 
+                stopPrice=stopPrice,
                 date=date,          # only used for backtest      
                 order_id=order_id
-            )        
+            )             
 
     def get_all_orders(self, 
                        query_all: bool = False,

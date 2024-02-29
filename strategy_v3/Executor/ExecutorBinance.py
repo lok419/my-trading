@@ -1,8 +1,9 @@
 from strategy_v3.Executor import ExecutorModel
 from account import Binance
 from datetime import datetime
-import numpy as np
+from binance.exceptions import BinanceAPIException 
 from pandas.core.frame import DataFrame
+import numpy as np
 
 class ExecutorBinance(ExecutorModel):
 
@@ -19,6 +20,7 @@ class ExecutorBinance(ExecutorModel):
                     timeInForce:str,
                     quantity:float,
                     price:float,
+                    stopPrice: float,                    
                     order_id:str,
                     date:datetime,
                     ):
@@ -33,10 +35,26 @@ class ExecutorBinance(ExecutorModel):
         if timeInForce is not None:
             params['timeInForce'] = timeInForce
 
-        if not(price is None or order_type == 'MARKET'):
+        if price is not None and order_type != 'MARKET':        
             params['price'] = str(price)         
+
+        if stopPrice is not None and order_type == 'STOP_LOSS_LIMIT':
+            params['stopPrice'] = str(stopPrice)
              
-        self.binance.place_order(**params)
+        try:
+            self.binance.place_order(**params)            
+        except BinanceAPIException as e:
+            self.logger.error(e)            
+
+            if e.code == -2010:
+                # APIError(code=-2010): Stop price would trigger immediately. 
+                params['type'] == 'LIMIT'
+                if 'stopPrice' in params:                    
+                    del params['stopPrice']
+                self.logger.error('replace with {} {} order at {}.'.format(params['symbol'], params['type'], params['price']))
+                self.binance.place_order(**params)
+            else:
+                raise(e)            
     
     def cancel_order(self, 
                      instrument:str, 
@@ -64,7 +82,7 @@ class ExecutorBinance(ExecutorModel):
         fees = self.binance.get_trading_fee(instrument=instrument).iloc[0]
         marker_fee = fees['makerCommission']
         taker_fee = fees['takerCommission']
-        df_orders['trading_fee'] = np.where(df_orders['type'] == 'LIMIT', marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['price']
+        df_orders['trading_fee'] = np.where(df_orders['type'].str.contains('LIMIT'), marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['price']
         df_orders['trading_fee'] = np.where(df_orders['status'] == 'FILLED', df_orders['trading_fee'], 0)
         df_orders['trading_fee'] = df_orders['trading_fee'].astype(float)
 

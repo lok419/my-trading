@@ -199,7 +199,7 @@ class StrategyPerformance(object):
                 grid_max_dt = temp['updateTime'].max()    
 
                 # when we draw the grid line, use the order price instead of fill price
-                grid_prices = sorted(temp[temp['type'] == 'LIMIT']['price'].values)
+                grid_prices = sorted(temp[temp['type'].str.contains('LIMIT')]['price'].values)
 
                 for i, grid in enumerate(grid_prices):                    
                     if i >= self.grid_size:
