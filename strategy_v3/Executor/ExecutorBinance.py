@@ -48,7 +48,7 @@ class ExecutorBinance(ExecutorModel):
 
             if e.code == -2010:
                 # APIError(code=-2010): Stop price would trigger immediately. 
-                params['type'] == 'LIMIT'
+                params['type'] = 'LIMIT'
                 if 'stopPrice' in params:                    
                     del params['stopPrice']
                 self.logger.error('replace with {} {} order at {}.'.format(params['symbol'], params['type'], params['price']))

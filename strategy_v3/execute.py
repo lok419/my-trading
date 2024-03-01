@@ -22,10 +22,10 @@ if __name__ == '__main__':
         position_size = 500,
         hurst_exp_mr_threshold = 0.6,
         hurst_exp_mo_threshold = 0.6,
+        price_decimal = 2,
+        qty_decimal = 5,
     )
-
-    strategy.set_price_decimal(2)
-    strategy.set_qty_decimal(5)
+    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
     strategy.set_strategy_id('v1')
