@@ -1,11 +1,10 @@
-from strategy_v3.Executor import ExecutorBinance, ExecutorModel, ExecutorBacktest
+from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
 from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, Status
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
 from utils.logging import get_logger
 from pandas.core.frame import DataFrame
-from enum import Enum
 from zoneinfo import ZoneInfo
 import pandas as pd
 import numpy as np

@@ -7,7 +7,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
 from requests.exceptions import Timeout
-import pickle
+from binance.exceptions import BinanceAPIException 
 
 warnings.filterwarnings('ignore')
 
@@ -44,7 +44,13 @@ if __name__ == '__main__':
                 sleep(60)
             except Timeout as e:
                 strategy.logger.error(e)        
-                strategy.logger.error('handled explicitly. retring....')        
+                strategy.logger.error('handled explicitly. retring....')     
+            except BinanceAPIException as e:
+                strategy.logger.error(e)
+                if e.code == '-1021':
+                    sleep(30)
+                else:
+                    raise(e)       
 
     except KeyboardInterrupt as e:        
         strategy.logger.error(e)        

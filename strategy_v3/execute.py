@@ -7,20 +7,20 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
 from requests.exceptions import Timeout
-import pickle
+from binance.exceptions import BinanceAPIException 
 
 warnings.filterwarnings('ignore')
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     strategy = GridArithmeticStrategy(
         instrument = 'BTCFDUSD',
         interval = '5m',
         grid_size = 5,
         vol_lookback = 15,
-        vol_grid_scale = 0.2,
+        vol_grid_scale = 0.15,
         vol_stoploss_scale = 7,
         position_size = 500,
-        hurst_exp_mr_threshold = 0.5,
+        hurst_exp_mr_threshold = 0.6,
         hurst_exp_mo_threshold = 0.6,
     )
 
@@ -45,6 +45,12 @@ if __name__ == '__main__':
             except Timeout as e:
                 strategy.logger.error(e)        
                 strategy.logger.error('handled explicitly. retring....')        
+            except BinanceAPIException as e:
+                strategy.logger.error(e)
+                if e.code == '-1021':
+                    sleep(30)
+                else:
+                    raise(e)                                
 
     except KeyboardInterrupt as e:        
         strategy.logger.error(e)        
