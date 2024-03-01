@@ -16,7 +16,7 @@ if __name__ == '__main__':
         instrument = 'SOLFDUSD',
         interval = '5m',
         grid_size = 5,
-        vol_lookback = 30,
+        vol_lookback = 15,
         vol_grid_scale = 0.05,
         vol_stoploss_scale = 7,
         position_size = 50,
