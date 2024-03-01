@@ -24,7 +24,9 @@ class GridArithmeticStrategy(StrategyPerformance):
                  position_size: float = 100,
                  hurst_exp_mr_threshold: float = 0.5,
                  hurst_exp_mo_threshold: float = float('inf'),
-                 verbose: bool = True
+                 price_decimal: int = 2,
+                 qty_decimal: int = 5,
+                 verbose: bool = True,
         ):
         '''
             instrument:             The instrument to trade
@@ -35,6 +37,8 @@ class GridArithmeticStrategy(StrategyPerformance):
             vol_stoploss_scale:     Stoploss distance from center of the grids in terms of historical volatility
             position_size:          Position for each orders in terms of $USD
             hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade
+            price_decimal:          rounding decimal of price
+            qty_decimal:            rounding decimal of quantity
             verbose:                True to print the log message
         '''
         self.instrument = instrument
@@ -45,7 +49,9 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.vol_stoploss_scale = vol_stoploss_scale
         self.position_size = position_size
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
-        self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
+        self.hurst_exp_mo_threshold = hurst_exp_mo_threshold        
+        self.qty_decimal = qty_decimal
+        self.price_decimal = price_decimal
 
         # this saves the current grid stats
         self.grid_id = 0
@@ -58,9 +64,6 @@ class GridArithmeticStrategy(StrategyPerformance):
         # strategy_id is used to identify the strategy from list of orders
         self.strategy_id = str(round(random.random() * 1e6))
         self.logger = get_logger(self.__str__())
-
-        self.qty_decimal = 5
-        self.price_decimal = 2
 
         # 5m -> 5mins for round function
         self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
@@ -95,18 +98,6 @@ class GridArithmeticStrategy(StrategyPerformance):
                 - For Binance, it is based on UTC time (i.e. GMT+0)
         '''
         self.data_loader = data_loader
-
-    def set_price_decimal(self, price_decimal:int):
-        '''
-            set price rounding decimal
-        '''
-        self.price_decimal = price_decimal
-
-    def set_qty_decimal(self, qty_decimal:int):
-        '''
-            set qty rounding decimal
-        '''
-        self.qty_decimal = qty_decimal
 
     def set_strategy_id(self, 
                         id:str,

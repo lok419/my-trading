@@ -1,0 +1,28 @@
+{
+    "v1": {
+        "instrument": "BTCFDUSD",
+        "interval": "5m",
+        "grid_size": 5,
+        "vol_lookback": 15,
+        "vol_grid_scale": 0.15,
+        "vol_stoploss_scale": 7,
+        "position_size": 500,
+        "hurst_exp_mr_threshold": 0.6,
+        "hurst_exp_mo_threshold": 0.6,
+        "price_decimal": 2,
+        "qty_decimal": 5
+    },
+    "SOLFDUSDv1": {
+        "instrument": "SOLFDUSD",
+        "interval": "5m",
+        "grid_size": 5,
+        "vol_lookback": 15,
+        "vol_grid_scale": 0.05,
+        "vol_stoploss_scale": 7,
+        "position_size": 50,
+        "hurst_exp_mr_threshold": 0.6,
+        "hurst_exp_mo_threshold": 0.6,
+        "price_decimal": 2,
+        "qty_decimal": 2
+    }
+}
