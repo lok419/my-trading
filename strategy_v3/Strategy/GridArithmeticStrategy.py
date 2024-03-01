@@ -109,12 +109,31 @@ class GridArithmeticStrategy(StrategyPerformance):
         '''
         self.qty_decimal = qty_decimal
 
-    def set_strategy_id(self, id:str):
+    def set_strategy_id(self, 
+                        id:str,
+                        reload: bool = True,
+                        ):
         '''
-            set strategy id. this is used to identify the orders from same strategy instance
+            Set strategy id. this is used to identify the orders from same strategy instance
+
+            id:     The strategy name
+            reload: True to reload all previous property (e.g. grid_id, grid_type) from latest
         '''
         self.strategy_id = id
         self.logger.name = self.__str__()    
+
+        if reload and not self.is_backtest():
+            df_orders = self.get_all_orders(limit=10)
+
+            if len(df_orders) > 0:
+                grid_type = df_orders.iloc[-1]['grid_type']
+                grid_id = df_orders.iloc[-1]['grid_id']
+
+                if self.grid_type is None:
+                    self.grid_type = GRID_TYPE[grid_type]
+
+                if self.grid_id == 0:
+                    self.grid_id = grid_id
 
     def is_backtest(self):
         return type(self.executor) is ExecutorBacktest
@@ -243,7 +262,7 @@ class GridArithmeticStrategy(StrategyPerformance):
     def get_status(self) -> Status:
         if self.is_idle():
             return Status.IDLE
-        elif self.is_position_neutral():
+        elif self.is_active_neutral():
             return Status.NEUTRAL
         else:
             return Status.ACTIVE
@@ -274,7 +293,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         is_idle = len(pending) == 0
         return is_idle
 
-    def is_position_neutral(self) -> bool:
+    def is_active_neutral(self) -> bool:
         '''
             Check if the filled orders are delta neutral given there is pending orders within last set of grid orders.
                 1. There is pending orders
@@ -306,29 +325,55 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         return has_filled and has_pending and abs(filled_net_qty) == 0
     
+    def is_delta_neutral(self) -> bool:
+        '''
+            Check if delta neutral by querying all orders
+        '''
+        all_orders = self.get_all_orders(query_all=True)    
+        filled = all_orders[all_orders['status'] == 'FILLED']
+        filled_net_qty = filled['NetExecutedQty'].sum()   
+        filled_net_qty = round(filled_net_qty, self.qty_decimal)
+
+        return abs(filled_net_qty) == 0
+    
     def close_out_positions(self,                                                         
                             type:str = 'close',
                             price: float = None,
                             date:datetime = None,
+                            force: bool = False
                             ):
         '''
             Close out all outstanding positions based on Grid orders
             type:  reason of the close out. Either stoploss or close (end of strategy)
             price: only for backtest, MARKET ORDER does not need price
             date:  only used for backtest
+            force: force to close out entire position (usually done manually)
         '''
         date = date if date is not None else self.get_current_time()
-        all_orders = self.get_all_orders()    
+        all_orders = self.get_all_orders(query_all=force)    
 
-        if not self.is_backtest():              
-            all_orders = all_orders[all_orders['time'] > self.execute_start_time]        
-        
+        if not self.is_backtest() and not force:                          
+            all_orders = all_orders[all_orders['time'] > self.execute_start_time]                    
+
         '''
-            Only check with last grid, we assume all previous grid are flatted
-            Binance API has 1000 orders limit, it could be cases that some of the filled orders got truncated and lead to wrong net position from last 1000 orders
+            Force to flatten all delta based on LTD orders
         '''
-        last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]  
-        filled = last_grid[last_grid['status'] == 'FILLED']
+        if force:            
+            filled = all_orders[all_orders['status'] == 'FILLED']            
+
+            last_grid_type = all_orders.iloc[-1]['grid_type']
+            last_grid_id = all_orders.iloc[-1]['grid_id']
+
+            if self.grid_type is None:
+                self.grid_type = GRID_TYPE[last_grid_type]
+
+            if self.grid_id is None:
+                self.grid_id = last_grid_id
+
+        else:
+
+            last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]  
+            filled = last_grid[last_grid['status'] == 'FILLED']
 
         filled_net_qty = filled['NetExecutedQty'].sum()   
         filled_net_qty = round(filled_net_qty, self.qty_decimal)
@@ -466,7 +511,8 @@ class GridArithmeticStrategy(StrategyPerformance):
 
     def get_all_orders(self, 
                        query_all: bool = False,
-                       trade_details: bool = False,                       
+                       trade_details: bool = False,     
+                       limit: int = 1000,                                         
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
@@ -474,8 +520,11 @@ class GridArithmeticStrategy(StrategyPerformance):
             query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
         '''
-        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details)
+        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
+
+        # some manual adjusting on orders id
+        df_orders['clientOrderId'] = np.where(df_orders['orderId'] == 249865056, 'grid_SOLFDUSDv1_gridid4_MD_close', df_orders['clientOrderId'])
 
         # find the grid_id of orders
         df_orders['grid_id'] = df_orders['clientOrderId'].apply(lambda x: int(re.search(r"(?<=gridid)\d+(?=_)", x)[0]))
@@ -491,21 +540,7 @@ class GridArithmeticStrategy(StrategyPerformance):
                 return grid_type
             except:
                 return ''              
-        df_orders['grid_type'] = df_orders['clientOrderId'].apply(grid_type_find)     
-
-        '''
-            Binance API does not show fill price for market orders, we need to fill it ourselves. 
-            We round to nearest interval and take the open price as market price
-        '''
-        # if type(self.executor) is ExecutorBinance and len(df_orders):
-        #     mkt_orders = df_orders[df_orders['type'] == 'MARKET']
-        #     df_orders = df_orders[df_orders['type'] != 'MARKET']
-            
-        #     mkt_orders['Date'] = mkt_orders['updateTime'].dt.round(self.interval_round)            
-        #     mkt_orders = pd.merge(mkt_orders, self.df[['Date', 'Open']], how='left', validate='m:1')
-        #     mkt_orders['price'] = np.where(mkt_orders['price'] > 0, mkt_orders['price'], mkt_orders['Open'])
-        #     mkt_orders = mkt_orders.drop(columns=['Open', 'Date'])
-        #     df_orders = pd.concat([df_orders, mkt_orders])            
+        df_orders['grid_type'] = df_orders['clientOrderId'].apply(grid_type_find)          
 
         return df_orders
     

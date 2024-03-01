@@ -160,6 +160,7 @@ class Binance(AccountModel):
                        start_date: datetime = datetime(2000,1,1),
                        end_date: datetime = datetime(2100,1,1),
                        trade_details: bool = False,
+                       limit: int = 1000,
                        ) -> DataFrame:
         '''
             All all orders from Binance
@@ -178,7 +179,7 @@ class Binance(AccountModel):
             date_ts = end_date_ts
 
             while date_ts >= start_date_ts:
-                orders_page = self.client.get_all_orders(symbol=instrument, limit=1000, endTime=date_ts)
+                orders_page = self.client.get_all_orders(symbol=instrument, limit=limit, endTime=date_ts)
                 self.logger.debug('Fetching {} orders...'.format(len(orders_page)))
 
                 min_date_ts = min([o['time'] for o in orders_page])
@@ -192,7 +193,7 @@ class Binance(AccountModel):
 
                 date_ts = min_date_ts - 1            
         else:
-            orders = self.client.get_all_orders(symbol=instrument, limit=1000)
+            orders = self.client.get_all_orders(symbol=instrument, limit=limit)
              
         orders = pd.DataFrame(orders)
 
