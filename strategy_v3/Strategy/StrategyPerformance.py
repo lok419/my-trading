@@ -10,7 +10,6 @@ import plotly
 import pandas as pd
 import numpy as np
 
-
 '''
     This is an extension class which consolidates all the pnl or performance related functions (e.g. plots, netting pnl)
 '''
@@ -158,7 +157,10 @@ class StrategyPerformance(object):
 
     def summary(self, 
                 plot_orders:bool=False, 
-                lastn: int=20):
+                lastn: int=20,
+                show_pnl_metrics: bool = True,
+                save_jpg_path: str = '',                
+                ):
         '''
             Summary the performance given the load periods
             plot_orders:    if plot orders on the graphs
@@ -173,15 +175,16 @@ class StrategyPerformance(object):
         df_pnl = self.compute_pnl(df_orders)        
         df_pnl_mr = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MEAN_REVERT.name])        
         df_pnl_mu = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_UP.name])        
-        df_pnl_md = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_DOWN.name])        
-        df_pnl_metric = self.compute_pnl_metrics(df_pnl, df_orders)
-
+        df_pnl_md = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_DOWN.name])                
+        df_pnl_metrics = self.compute_pnl_metrics(df_pnl, df_orders)
+            
         # just save the data to object property
         self.df_orders = df_orders
         self.df_pnl = df_pnl
-        self.df_pnl_metric  = df_pnl_metric
+        self.df_pnl_metrics = df_pnl_metrics
 
-        display(df_pnl_metric)
+        if show_pnl_metrics:
+            display(df_pnl_metrics)
 
         fig = make_subplots(
             rows=4, cols=1, 
@@ -280,4 +283,9 @@ class StrategyPerformance(object):
 
         fig.add_trace(go.Scatter(x=df['Date'], y=df['half_life'], showlegend=False), row=3,col=1)
         fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=4,col=1)        
-        fig.show()
+
+        if len(save_jpg_path) == 0:
+            fig.show()
+        else:                        
+            fig.write_image(save_jpg_path, format='jpg')            
+

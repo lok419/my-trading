@@ -1,33 +1,50 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
 from telegram.constants import ParseMode
-from utils.credentials import TELEGRAM_BOT_API_KEY
+from utils.credentials import TELEGRAM_BOT_API_KEY, NGROK_DOMAIN, NGROK_PORT_TUNNEL, NGROK_DOMAIN_URL
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from strategy_v3.DataLoader import DataLoaderBinance
 from strategy_v3.Executor import ExecutorBinance
 from strategy_v3.Strategy import GridArithmeticStrategy
 from tabulate import tabulate
+from utils.logging import get_logger
 import json
 import warnings
+import tempfile
+import subprocess
+
 warnings.filterwarnings('ignore')
+logger = get_logger('Telegram Bot')
+
+def handler_print(func):
+    '''
+        Decorator: Print the handle command here
+    '''
+    async def inner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.info(f"[{update.message.from_user.username}] {update.message.text}")            
+        await func(update=update, context=context)
+
+    return inner
 
 def handler_expcetion(func):
     '''
-        Handle Exception for each handler to response back the error message to users
+        Decorator: Handle Exception for each handler to response back the error message to users
     '''
     async def inner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await func(update=update, context=context)
         except Exception as e:
+            logger.error(e)
             msg = f'failed - {e}'
             await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
     return inner
 
 @handler_expcetion
+@handler_print
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):            
     '''
         Print out all active strategy
-    '''
+    '''    
     config = ExecuteSetup.read_all()
     strategy = list(config.keys())
     msg = "List of strategy:\n"
@@ -35,6 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
 
 @handler_expcetion
+@handler_print
 async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):    
     '''
         Print out all strategy configuration        
@@ -48,6 +66,7 @@ async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
 
 @handler_expcetion
+@handler_print
 async def update(update: Update, context: ContextTypes.DEFAULT_TYPE):   
     '''
         Update strategy configuration
@@ -64,10 +83,11 @@ async def update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
 
 @handler_expcetion
-async def performance(update: Update, context: ContextTypes.DEFAULT_TYPE):        
+@handler_print
+async def pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):        
     '''
-        Table summary of strategy performance
-    '''    
+        Table summary of strategy pnl performance 
+    '''        
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])
     params = ExecuteSetup(strategy_id).read()
@@ -79,13 +99,62 @@ async def performance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     strategy.load_data(time)
 
     table = strategy.summary_table()
-    msg = tabulate(table, headers='keys', tablefmt='psql', showindex=False)    
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f'<pre>{msg}</pre>', parse_mode=ParseMode.HTML)
+    table = tabulate(table, headers='keys', tablefmt='psql', showindex=False)    
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f'<pre>{table}</pre>', parse_mode=ParseMode.HTML)
+
+@handler_expcetion
+@handler_print
+async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    '''
+        Plot summary of strategy performance
+    '''    
+    strategy_id = context.args[0]
+    time = " ".join(context.args[1:])
+    params = ExecuteSetup(strategy_id).read()
+
+    strategy = GridArithmeticStrategy(**params)
+    strategy.set_data_loder(DataLoaderBinance())
+    strategy.set_executor(ExecutorBinance())
+    strategy.set_strategy_id(strategy_id)
+    strategy.load_data(time)
+
+    with tempfile.NamedTemporaryFile(delete=True, suffix='.jpg') as file:        
+        strategy.summary(plot_orders=True, lastn=20, save_jpg_path=file.name, show_pnl_metrics=False)        
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=file.name)    
+
+@handler_expcetion
+@handler_print
+async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    '''
+        display pnl metrics summary table and plots
+    '''    
+    strategy_id = context.args[0]
+    time = " ".join(context.args[1:])
+    params = ExecuteSetup(strategy_id).read()
+
+    strategy = GridArithmeticStrategy(**params)
+    strategy.set_data_loder(DataLoaderBinance())
+    strategy.set_executor(ExecutorBinance())
+    strategy.set_strategy_id(strategy_id)
+    strategy.load_data(time)
+
+    with tempfile.NamedTemporaryFile(delete=True, suffix='.jpg') as file:        
+        strategy.summary(plot_orders=True, lastn=20, save_jpg_path=file.name, show_pnl_metrics=False)
+        table = strategy.df_pnl_metrics
+        table = tabulate(table, headers='keys', tablefmt='psql', showindex=False)    
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f'<pre>{table}</pre>', parse_mode=ParseMode.HTML)
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=file.name)    
+
 
 if __name__ == '__main__':
+    # tunnel localhost:5001 to public static domain
+    subprocess.Popen(f"nohup ngrok http --domain={NGROK_DOMAIN} {NGROK_PORT_TUNNEL} >/dev/null 2>&1 &", shell=True)
+
     application = ApplicationBuilder().token(TELEGRAM_BOT_API_KEY).build()        
     application.add_handler(CommandHandler('start', start)) 
     application.add_handler(CommandHandler('config', config))   
     application.add_handler(CommandHandler('update', update))   
-    application.add_handler(CommandHandler('performance', performance))  
-    application.run_polling()    
+    application.add_handler(CommandHandler('pnl', pnl))  
+    application.add_handler(CommandHandler('plot', plot))  
+    application.add_handler(CommandHandler('summary', summary))
+    application.run_webhook(listen='127.0.0.1', port=5001, webhook_url=NGROK_DOMAIN_URL)
