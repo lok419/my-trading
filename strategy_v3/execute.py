@@ -52,6 +52,7 @@ if __name__ == '__main__':
                 update_strategy_params(strategy, strategy_setup)
                 
                 if strategy.position_size > 0:
+                    # 360 data points
                     strategy.load_data('1 Days Ago')                                
                     df = strategy.df
                     data = df.iloc[-1]                

@@ -127,7 +127,7 @@ class StrategyPerformance(object):
         grid_count = len(df_orders['grid_id'].unique())
 
         sr = (ret_mean - rf_)/ret_std * np.sqrt(360*24*60/interval)        
-        ret_cum = np.cumprod(ret_ts+1)[-1]
+        ret_cum = 1 + df_pnl['return_cum'].iloc[-1]
         ret_mean_ann = ret_mean * 360*24*60/interval
         ret_std_ann = ret_std  * np.sqrt(360*24*60/interval)
 

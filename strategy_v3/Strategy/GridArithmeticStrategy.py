@@ -132,10 +132,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
 
     def load_data(self, lookback):
-        df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)        
-
-        # need at least 100 data points to determine the hurst exponent ratio
-        assert len(df) > min(100, self.vol_lookback)
+        df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)                
         
         '''
             for backtest, we cannot use close price for the same interval as this implies lookahead bias
@@ -179,14 +176,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         df['Close_sma_hl'] = close_hl     
         df['Close_sma_hl'] = df['Close_sma_hl'].shift(shift)
         df['Vol_hl'] = vol_hl
-        df['Vol_hl'] = df['Vol_hl'].shift(shift)
-
-        # remove all null data
-        df = df[~df['Vol'].isnull()]
-        df = df[~df['half_life'].isnull()]
-        df = df[~df['hurst_exponent'].isnull()]
-
-        assert len(df) > 0, 'timeframe is too short, try to extend the timeframe'
+        df['Vol_hl'] = df['Vol_hl'].shift(shift)                
 
         self.df = df    
 
@@ -202,7 +192,7 @@ class GridArithmeticStrategy(StrategyPerformance):
 
             data: structure contains all required data for strategy
         '''        
-        
+
         date = data['Date']
         hurst_exponent = data['hurst_exponent']
         open, close, high, low = data['Open'], data['Close'], data['High'], data['Low']            
