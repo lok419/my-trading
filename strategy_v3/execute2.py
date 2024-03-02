@@ -17,7 +17,7 @@ if __name__ == '__main__':
         interval = '5m',
         grid_size = 5,
         vol_lookback = 15,
-        vol_grid_scale = 0.15,
+        vol_grid_scale = 0.2,
         vol_stoploss_scale = 7,
         position_size = 50,
         hurst_exp_mr_threshold = 0.6,
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
-    strategy.set_strategy_id('SOLFDUSDv1')
+    strategy.set_strategy_id('SOLv1')
     
     try:
         while True:    

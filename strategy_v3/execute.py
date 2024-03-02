@@ -17,7 +17,7 @@ if __name__ == '__main__':
         interval = '5m',
         grid_size = 5,
         vol_lookback = 15,
-        vol_grid_scale = 0.15,
+        vol_grid_scale = 0.2,
         vol_stoploss_scale = 7,
         position_size = 500,
         hurst_exp_mr_threshold = 0.6,
