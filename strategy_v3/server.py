@@ -1,5 +1,6 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
+from telegram.constants import ParseMode
 from utils.credentials import TELEGRAM_BOT_API_KEY
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from strategy_v3.DataLoader import DataLoaderBinance
@@ -78,8 +79,8 @@ async def performance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     strategy.load_data(time)
 
     table = strategy.summary_table()
-    msg = tabulate(table, headers='keys', tablefmt='psql')    
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
+    msg = tabulate(table, headers='keys', tablefmt='psql', showindex=False)    
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f'<pre>{msg}</pre>', parse_mode=ParseMode.HTML)
 
 if __name__ == '__main__':
     application = ApplicationBuilder().token(TELEGRAM_BOT_API_KEY).build()        
@@ -87,5 +88,4 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('config', config))   
     application.add_handler(CommandHandler('update', update))   
     application.add_handler(CommandHandler('performance', performance))  
-
     application.run_polling()    

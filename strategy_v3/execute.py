@@ -37,7 +37,7 @@ def update_strategy_params(strategy: GridArithmeticStrategy, strategy_setup: Exe
 
 if __name__ == '__main__':    
 
-    strategy_id = sys.argv[0]    
+    strategy_id = sys.argv[1]    
     strategy_setup = ExecuteSetup(strategy_id)
     strategy_params = strategy_setup.read()
     

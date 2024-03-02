@@ -163,3 +163,4 @@ cython_debug/
 *.h5
 *.csv
 *.pl
+strategy_v3/execute.json
