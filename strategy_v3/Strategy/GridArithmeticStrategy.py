@@ -185,6 +185,9 @@ class GridArithmeticStrategy(StrategyPerformance):
         df = df[~df['Vol'].isnull()]
         df = df[~df['half_life'].isnull()]
         df = df[~df['hurst_exponent'].isnull()]
+
+        assert len(df) > 0, 'timeframe is too short, try to extend the timeframe'
+
         self.df = df    
 
     def execute(self, data):
@@ -198,7 +201,8 @@ class GridArithmeticStrategy(StrategyPerformance):
                 - high and low price to see if fill orders and triggers stop loss
 
             data: structure contains all required data for strategy
-        '''
+        '''        
+        
         date = data['Date']
         hurst_exponent = data['hurst_exponent']
         open, close, high, low = data['Open'], data['Close'], data['High'], data['Low']            

@@ -86,7 +86,7 @@ class StrategyPerformance(object):
         df_pnl['Date'] = df_pnl['Date'].dt.round(self.interval_round)        
         df_pnl = df_pnl.groupby(['Date']).aggregate({'pnl_gross': 'sum', 'grid_id': 'first'}).reset_index()
 
-        df_pnl = pd.merge(self.df[['Date']], df_pnl, how='left', on='Date', validate='1:1')
+        df_pnl = pd.merge(self.df[['Date']], df_pnl, how='outer', on='Date', validate='1:1')
         df_pnl = pd.merge(df_pnl, df_fee, how='left', on=['Date'], validate='1:1')
         df_pnl = df_pnl.fillna(0)
 
@@ -112,20 +112,30 @@ class StrategyPerformance(object):
 
         return df_pnl
     
-    def compute_pnl_metrics(self, df_pnl:DataFrame) -> DataFrame:
+    def compute_pnl_metrics(self, 
+                            df_pnl:DataFrame,
+                            df_orders: DataFrame) -> DataFrame:
         interval = int(self.interval.replace('m', ''))
+
         rf = get_latest_risk_free_rate()
         rf_ = rf / (24*60/interval)
         ret_ts = df_pnl['return'].values
         ret_mean = np.mean(ret_ts)
         ret_std = np.std(ret_ts)
 
+        pnl = df_pnl['pnl'].sum()
+        trading_fee = df_pnl['trading_fee'].sum()
+        grid_count = len(df_orders['grid_id'].unique())
+
         sr = (ret_mean - rf_)/ret_std * np.sqrt(360*24*60/interval)        
         ret_cum = np.cumprod(ret_ts+1)[-1]
         ret_mean_ann = ret_mean * 360*24*60/interval
         ret_std_ann = ret_std  * np.sqrt(360*24*60/interval)
 
-        perf = {}            
+        perf = {}   
+        perf['pnl'] = pnl
+        perf['trading_fee'] = trading_fee   
+        perf['grid_count'] = grid_count        
         perf['cumulative_return'] = ret_cum 
         perf['annualized_return'] = ret_mean_ann
         perf['annualized_volatility'] = ret_std_ann
@@ -135,6 +145,16 @@ class StrategyPerformance(object):
         measures = [title_case(x) for x in list(perf.keys())]
         perf = pd.DataFrame({'Measure': measures, self.__str__(): list(perf.values())})  
         return perf
+    
+    def summary_table(self):
+        df = self.df
+        df_orders = self.get_all_orders(query_all=True, trade_details=True)
+        df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
+        df_orders = df_orders[df_orders['updateTime'] >= df['Date'].min()]
+        df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max() + timedelta(minutes=self.interval_min)]        
+        df_pnl = self.compute_pnl(df_orders)        
+        df_pnl_metric = self.compute_pnl_metrics(df_pnl, df_orders)
+        return df_pnl_metric
 
     def summary(self, 
                 plot_orders:bool=False, 
@@ -154,7 +174,7 @@ class StrategyPerformance(object):
         df_pnl_mr = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MEAN_REVERT.name])        
         df_pnl_mu = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_UP.name])        
         df_pnl_md = self.compute_pnl(df_orders[df_orders['grid_type'] == GRID_TYPE.MOMENTUM_DOWN.name])        
-        df_pnl_metric = self.compute_pnl_metrics(df_pnl)
+        df_pnl_metric = self.compute_pnl_metrics(df_pnl, df_orders)
 
         # just save the data to object property
         self.df_orders = df_orders

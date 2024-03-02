@@ -1,11 +1,8 @@
 import pandas as pd
 import warnings
-import sys
-import json
 from strategy_v3.Strategy import GridArithmeticStrategy
 from strategy_v3.Executor import ExecutorBinance
 from strategy_v3.DataLoader import DataLoaderBinance
-from strategy_v3.ExecuteSetup import ExecuteSetup
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
@@ -15,15 +12,23 @@ from binance.exceptions import BinanceAPIException
 warnings.filterwarnings('ignore')
 
 if __name__ == '__main__':    
-
-    strategy_id = sys.argv[0]    
-    strategy_setup = ExecuteSetup(strategy_id)
-    strategy_params = strategy_setup.read()
+    strategy = GridArithmeticStrategy(
+        instrument = 'BTCFDUSD',
+        interval = '5m',
+        grid_size = 5,
+        vol_lookback = 15,
+        vol_grid_scale = 0.2,
+        vol_stoploss_scale = 7,
+        position_size = 500,
+        hurst_exp_mr_threshold = 0.6,
+        hurst_exp_mo_threshold = 0.6,
+        price_decimal = 2,
+        qty_decimal = 5,
+    )
     
-    strategy = GridArithmeticStrategy(**strategy_params)    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
-    strategy.set_strategy_id(strategy_id)
+    strategy.set_strategy_id('v1')
     
     try:
         while True:    

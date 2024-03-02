@@ -1,8 +1,12 @@
 import pandas as pd
 import warnings
+import sys
+import json
+from pandas.core.frame import DataFrame
 from strategy_v3.Strategy import GridArithmeticStrategy
 from strategy_v3.Executor import ExecutorBinance
 from strategy_v3.DataLoader import DataLoaderBinance
+from strategy_v3.ExecuteSetup import ExecuteSetup
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
@@ -11,43 +15,61 @@ from binance.exceptions import BinanceAPIException
 
 warnings.filterwarnings('ignore')
 
+def sanity_check_data(df: DataFrame, data: dict):
+    '''
+        Sanity check the input data and make sure data are latest
+    '''
+    dt_now = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
+    interval = df['Date'].diff().iloc[-1].seconds
+    since_last = (dt_now - data['Date']).seconds
+    assert since_last <= interval
+
+def update_strategy_params(strategy: GridArithmeticStrategy, strategy_setup: ExecuteSetup):
+    '''
+        This allow user to update the strategy parameters on the fly by changing the execute_setup.json
+    '''
+    strategy_params = strategy_setup.read()
+    for key, value in strategy_params.items():
+        value_org = getattr(strategy, key)
+        if value != value_org:
+            strategy.logger.info(f'update {key} from {value_org} to {value}')
+            setattr(strategy, key, value)
+
 if __name__ == '__main__':    
-    strategy = GridArithmeticStrategy(
-        instrument = 'BTCFDUSD',
-        interval = '5m',
-        grid_size = 5,
-        vol_lookback = 15,
-        vol_grid_scale = 0.2,
-        vol_stoploss_scale = 7,
-        position_size = 500,
-        hurst_exp_mr_threshold = 0.6,
-        hurst_exp_mo_threshold = 0.6,
-        price_decimal = 2,
-        qty_decimal = 5,
-    )
+
+    strategy_id = sys.argv[0]    
+    strategy_setup = ExecuteSetup(strategy_id)
+    strategy_params = strategy_setup.read()
     
+    strategy = GridArithmeticStrategy(**strategy_params)    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
-    strategy.set_strategy_id('v1')
+    strategy.set_strategy_id(strategy_id)    
     
     try:
         while True:    
-            try:
-                strategy.load_data('1 Days Ago')
-                df = strategy.df.copy()
-                data = df.iloc[-1]
-                dt_now = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
-                interval = df['Date'].diff().iloc[-1].seconds
-                since_last = (dt_now - data['Date']).seconds
-                assert since_last <= interval
-                strategy.execute(data)        
+            try:                
+                update_strategy_params(strategy, strategy_setup)
+                
+                if strategy.position_size > 0:
+                    strategy.load_data('1 Days Ago')                                
+                    df = strategy.df
+                    data = df.iloc[-1]                
+                    sanity_check_data(df, data)            
+                    strategy.execute(data)    
+                else:
+                    strategy.logger.info('position size is 0 and strategy is puased....')
+
                 sleep(60)
+
             except Timeout as e:
                 strategy.logger.error(e)        
-                strategy.logger.error('handled explicitly. retring....')        
+                strategy.logger.error('handled explicitly. retring....')
+
             except BinanceAPIException as e:
-                strategy.logger.error(e)
+                strategy.logger.error(e)                
                 if e.code == '-1021':
+                    strategy.logger.error('handled explicitly. retring....')
                     sleep(30)
                 else:
                     raise(e)                                
