@@ -287,5 +287,5 @@ class StrategyPerformance(object):
         if len(save_jpg_path) == 0:
             fig.show()
         else:                        
-            fig.write_image(save_jpg_path, format='jpg')            
+            fig.write_image(save_jpg_path, format='png')
 
