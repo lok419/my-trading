@@ -71,11 +71,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         Print out all active strategy
     '''        
     config = ExecuteSetup.read_all() 
-    button_list = []
+    button_list = []    
     for s in list(config.keys()):
         button_list.append([InlineKeyboardButton(text=s, callback_data=f'/action {s}')])
+    button_list.append([InlineKeyboardButton(text='config', callback_data=f'/config')])
     markup = InlineKeyboardMarkup(button_list)    
-    await context.bot.send_message(chat_id=update.effective_chat.id, text='List of strategy:', reply_markup=markup)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text='List of strategy and global config:', reply_markup=markup)
 
 @handler_expcetion
 @handler_print
@@ -240,5 +241,4 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('plot', plot))  
     application.add_handler(CommandHandler('summary', summary))
     application.add_handler(CallbackQueryHandler(button_callback))
-
     application.run_webhook(listen='127.0.0.1', port=5001, webhook_url=NGROK_DOMAIN_URL)
