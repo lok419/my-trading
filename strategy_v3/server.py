@@ -16,6 +16,16 @@ import subprocess
 warnings.filterwarnings('ignore')
 logger = get_logger('Telegram Bot')
 
+default_update_options = {
+    'grid_size': [3,5,7,10],
+    'vol_lookback': [10, 15, 20, 30, 40, 60],
+    'vol_grid_scale': [0.05, 0.1, 0.15, 0.2, 0.25, 0.3 ,0.4],
+    'vol_stoploss_scale': [7,8,9,10],
+    'position_size': [50, 100, 300, 500, 1000],
+    'hurst_exp_mr_threshold': [0, 0.4, 0.5, 0.6],
+    'hurst_exp_mo_threshold': [0.6, 0.7, 0.8, 1],
+}
+
 def handler_print(func):
     '''
         Decorator: Print the handle command here
@@ -74,6 +84,7 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     button_list = []    
     button_list.append([InlineKeyboardButton(text='Back', callback_data=f'/start')]) 
     button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])  
+    button_list.append([InlineKeyboardButton(text='Update', callback_data=f'/update {s}')])  
     button_list.append([
         InlineKeyboardButton(text='Run', callback_data=f'/update {s} status RUN'),
         InlineKeyboardButton(text='Pause', callback_data=f'/update {s} status PAUSE'), 
@@ -95,6 +106,53 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @handler_expcetion
 @handler_print
+async def update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    s = context.args[0]    
+    key = context.args[1] if len(context.args) > 1 else None
+    value = context.args[2] if len(context.args) > 2  else None 
+
+    # display which params to update
+    if key is None and value is None:    
+        button_list = []        
+        button_list.append([InlineKeyboardButton(text='Back', callback_data=f'/action {s}')])
+        button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])
+        for p in default_update_options:
+            button_list.append([InlineKeyboardButton(text=p, callback_data=f'/update {s} {p}')])    
+
+        markup = InlineKeyboardMarkup(button_list)    
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f'Strategy {s} params:', reply_markup=markup)
+
+    # display a default options
+    elif key is not None and value is None:
+        button_list = []   
+        button_list.append([InlineKeyboardButton(text='Back', callback_data=f'/update {s}')])
+        button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])
+
+        current_val = ExecuteSetup(s).read()[key]                
+        default_vals = default_update_options[key]
+        default_vals.append(current_val)
+        default_vals = sorted(list(set(default_vals)))
+
+        for v in default_vals:
+            text = f'{v} (current)' if v == current_val else v                    
+            button_list.append([InlineKeyboardButton(text=text, callback_data=f'/update {s} {key} {v}')])    
+
+        markup = InlineKeyboardMarkup(button_list)    
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f'Strategy {s} params {key}:', reply_markup=markup)
+
+    # update a key and value
+    elif key is not None and value is not None:
+        setup = ExecuteSetup(s)
+        setup.update(key, value)
+        config = setup.read()
+        config = str(json.dumps(config, indent=4))        
+        msg = 'succeeded\n'
+        msg += config
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
+
+
+@handler_expcetion
+@handler_print
 async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):    
     '''
         Print out all strategy configuration        
@@ -105,23 +163,6 @@ async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):
         config = config[strategy_id]
     
     msg = str(json.dumps(config, indent=4))    
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
-
-@handler_expcetion
-@handler_print
-async def update(update: Update, context: ContextTypes.DEFAULT_TYPE):   
-    '''
-        Update strategy configuration
-    '''
-
-    strategy_id, key, value = context.args
-    setup = ExecuteSetup(strategy_id)
-    setup.update(key, value)
-    config = setup.read()
-    config = str(json.dumps(config, indent=4))        
-    msg = 'succeeded\n'
-    msg += config
-
     await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
 
 @handler_expcetion
