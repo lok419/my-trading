@@ -15,7 +15,7 @@ class TS_PROP(Enum):
     MEAN_REVERT = 1
     MOMENTUM = 2
 
-class STATE(Enum):
+class STATUS(Enum):
     RUN = 0
     PAUSE = 1
     TERMINATE = 2

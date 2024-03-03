@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     strategy_id = sys.argv[1]    
     strategy_setup = ExecuteSetup(strategy_id)
-    strategy_params = strategy_setup.read()
+    strategy_params = strategy_setup.read()    
     
     strategy = GridArithmeticStrategy(**strategy_params)    
     strategy.set_data_loder(DataLoaderBinance())

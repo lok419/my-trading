@@ -1,6 +1,6 @@
 from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
-from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATE
+from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATUS
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
@@ -27,7 +27,7 @@ class GridArithmeticStrategy(StrategyPerformance):
                  hurst_exp_mo_threshold: float = float('inf'),
                  price_decimal: int = 2,
                  qty_decimal: int = 5,                             
-                 state: str = STATE.RUN,
+                 status: str = STATUS.RUN,
                  verbose: bool = True,                 
         ):
         '''
@@ -41,7 +41,7 @@ class GridArithmeticStrategy(StrategyPerformance):
             hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
-            state:                  user can set state to control the strategy behavior
+            status:                 user can set status to control the strategy behavior
             verbose:                True to print the log message
         '''
         self.instrument = instrument
@@ -55,7 +55,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold        
         self.qty_decimal = qty_decimal
         self.price_decimal = price_decimal
-        self.state = state
+        self.status = status
 
         # this saves the current grid stats
         self.grid_id = 0
@@ -87,18 +87,18 @@ class GridArithmeticStrategy(StrategyPerformance):
         return 'grid_{}'.format(self.strategy_id)
     
     @property
-    def state(self) -> STATE:
-        return self._state
+    def status(self) -> STATUS:
+        return self._status
     
-    @state.setter
-    def state(self, state: str|STATE):
-        if type(state) is STATE:
-            self._state = state
+    @status.setter
+    def status(self, status: str|STATUS):
+        if type(status) is STATUS:
+            self._status = status
         else:
             try:
-                self._state = STATE._member_map_[state]
+                self._status = STATUS._member_map_[status]
             except:
-                self.logger.error(f'unknown state {state}...')
+                self.logger.error(f'unknown status {status}...')
 
     def set_executor(self, executor:ExecutorModel):
         '''
@@ -232,18 +232,18 @@ class GridArithmeticStrategy(StrategyPerformance):
         
         grid_status = self.get_grid_status()
         ts_prop = self.get_ts_prop(data)        
-        self.logger.info('state: {}, grid_status: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(self.state.name, grid_status.name, ts_prop.name, hurst_exponent))
+        self.logger.info('status: {}, grid_status: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(self.status.name, grid_status.name, ts_prop.name, hurst_exponent))
 
         '''
-            When state is STOP, return
+            When status is STOP, return
         '''
-        if self.state == STATE.STOP:            
+        if self.status == STATUS.STOP:            
             return           
 
         '''
-            When state is RUN, grid status is IDLE and time-series is not random => place grid orders            
+            When status is RUN, grid status is IDLE and time-series is not random => place grid orders            
         '''
-        if self.state == STATE.RUN and grid_status == GRID_STATUS.IDLE and ts_prop != TS_PROP.RANDOM:            
+        if self.status == STATUS.RUN and grid_status == GRID_STATUS.IDLE and ts_prop != TS_PROP.RANDOM:            
             center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
             current_vol = vol
             current_px = open if self.is_backtest() else close
@@ -279,14 +279,14 @@ class GridArithmeticStrategy(StrategyPerformance):
             self.close_out_positions('stoploss', stop_px, date)
 
         '''
-            If state is terminate, cancel all orders and close out the positions
-            Update state to STOP so the strategy won't run
+            If status is terminate, cancel all orders and close out the positions
+            Update status to STOP so the strategy won't run
         '''        
-        if self.state == STATE.TERMINATE:
+        if self.status == STATUS.TERMINATE:
             self.cancel_all_orders()                        
             self.close_out_positions('close', None, None, force=True)
-            self.state = STATE.STOP
-            ExecuteSetup(self.strategy_id).update("state", STATE.STOP.name)
+            self.status = STATUS.STOP
+            ExecuteSetup(self.strategy_id).update("status", STATUS.STOP.name)
 
     def get_grid_status(self) -> GRID_STATUS:
         if self.is_idle():
