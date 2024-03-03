@@ -1,6 +1,7 @@
 from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
-from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, Status
+from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATE
+from strategy_v3.ExecuteSetup import ExecuteSetup
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
 from utils.logging import get_logger
@@ -25,8 +26,9 @@ class GridArithmeticStrategy(StrategyPerformance):
                  hurst_exp_mr_threshold: float = 0.5,
                  hurst_exp_mo_threshold: float = float('inf'),
                  price_decimal: int = 2,
-                 qty_decimal: int = 5,
-                 verbose: bool = True,
+                 qty_decimal: int = 5,                             
+                 state: str = STATE.RUN.name,
+                 verbose: bool = True,                 
         ):
         '''
             instrument:             The instrument to trade
@@ -39,6 +41,7 @@ class GridArithmeticStrategy(StrategyPerformance):
             hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
+            state:                  user can set state to control the strategy behavior
             verbose:                True to print the log message
         '''
         self.instrument = instrument
@@ -52,6 +55,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold        
         self.qty_decimal = qty_decimal
         self.price_decimal = price_decimal
+        self.state = state
 
         # this saves the current grid stats
         self.grid_id = 0
@@ -197,12 +201,12 @@ class GridArithmeticStrategy(StrategyPerformance):
                 - high and low price to see if fill orders and triggers stop loss
 
             data: structure contains all required data for strategy
-        '''        
+        '''
 
         date = data['Date']
         hurst_exponent = data['hurst_exponent']
         open, close, high, low = data['Open'], data['Close'], data['High'], data['Low']            
-        vol = data['atr']        
+        vol = data['atr']
 
         if vol is None or math.isnan(vol):
             self.logger.error('historical volatility is null. exit.'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
@@ -212,12 +216,20 @@ class GridArithmeticStrategy(StrategyPerformance):
             self.logger.error('hurst exponent is null. exit.'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
             return        
         
-        status = self.get_status()
-        ts_prop = self.get_ts_prop(data)
-        self.logger.info('state: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(status.name, ts_prop.name, hurst_exponent))
+        grid_status = self.get_grid_status()
+        ts_prop = self.get_ts_prop(data)        
+        self.logger.info('state: {}, grid_status: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(self.state, grid_status.name, ts_prop.name, hurst_exponent))
 
-        # At beginning of periods, use open price to create grid orders                
-        if status == Status.IDLE and ts_prop != TS_PROP.RANDOM:            
+        '''
+            When state is STOP, return
+        '''
+        if self.state == STATE.STOP.name:            
+            return           
+
+        '''
+            When state is RUN, grid status is IDLE and time-series is not random => place grid orders            
+        '''
+        if self.state == STATE.RUN.name and grid_status == GRID_STATUS.IDLE and ts_prop != TS_PROP.RANDOM:            
             center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
             current_vol = vol
             current_px = open if self.is_backtest() else close
@@ -227,35 +239,48 @@ class GridArithmeticStrategy(StrategyPerformance):
                 self.stoploss = stoploss
 
         '''
-            Only used for backtest - fill the orders using high and low            
+            Only used for backtest - fill the orders using high and low
         '''        
         self.executor.fill_orders(date, low, high)        
-        status = self.get_status()            
+        grid_status = self.get_grid_status()
 
-        # after filling, if position is netural, cancel all orders
-        if status == Status.NEUTRAL:
-            self.logger.info('status: {}.'.format(status.name))      
+        '''
+            After filling, check if position is active netural. If yes, cancel all orders
+        '''        
+        if grid_status == GRID_STATUS.NEUTRAL:
+            self.logger.info('status: {}.'.format(grid_status.name))      
             self.cancel_all_orders()            
 
-        # finally, check the close price and determine if we need stop loss            
-        if status == Status.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1]):                         
+        '''
+            Check the close price and determine if we need stop loss        
+        '''        
+        if grid_status == GRID_STATUS.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1]):                         
             stop_px = self.stoploss[0] if close < self.stoploss[0] else self.stoploss[1]
             stop_px = round(stop_px, self.price_decimal)
             self.logger.info('stop loss are triggered at {}.'.format(stop_px))
 
             # for real trading, we don't need a actual price for stoploss
-            stop_px = stop_px if self.is_backtest() else None
-            
+            stop_px = stop_px if self.is_backtest() else None            
             self.cancel_all_orders()
             self.close_out_positions('stoploss', stop_px, date)
 
-    def get_status(self) -> Status:
+        '''
+            If state is terminate, cancel all orders and close out the positions
+            Update state to STOP so the strategy won't run
+        '''        
+        if self.state == STATE.TERMINATE.name:
+            self.cancel_all_orders()                        
+            self.close_out_positions('close', None, None, force=True)
+            self.state = STATE.STOP.name
+            ExecuteSetup(self.strategy_id).update("state", STATE.STOP.name)
+
+    def get_grid_status(self) -> GRID_STATUS:
         if self.is_idle():
-            return Status.IDLE
+            return GRID_STATUS.IDLE
         elif self.is_active_neutral():
-            return Status.NEUTRAL
+            return GRID_STATUS.NEUTRAL
         else:
-            return Status.ACTIVE
+            return GRID_STATUS.ACTIVE
         
     def get_ts_prop(self, data: dict) -> TS_PROP:
         hurst_exponent = data['hurst_exponent']
