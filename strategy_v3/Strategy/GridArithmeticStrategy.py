@@ -27,7 +27,7 @@ class GridArithmeticStrategy(StrategyPerformance):
                  hurst_exp_mo_threshold: float = float('inf'),
                  price_decimal: int = 2,
                  qty_decimal: int = 5,                             
-                 state: str = STATE.RUN.name,
+                 state: str = STATE.RUN,
                  verbose: bool = True,                 
         ):
         '''
@@ -85,6 +85,20 @@ class GridArithmeticStrategy(StrategyPerformance):
 
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
+    
+    @property
+    def state(self) -> STATE:
+        return self._state
+    
+    @state.setter
+    def state(self, state: str|STATE):
+        if type(state) is STATE:
+            self._state = state
+        else:
+            try:
+                self._state = STATE._member_map_[state]
+            except:
+                self.logger.error(f'unknown state {state}...')
 
     def set_executor(self, executor:ExecutorModel):
         '''
@@ -218,18 +232,18 @@ class GridArithmeticStrategy(StrategyPerformance):
         
         grid_status = self.get_grid_status()
         ts_prop = self.get_ts_prop(data)        
-        self.logger.info('state: {}, grid_status: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(self.state, grid_status.name, ts_prop.name, hurst_exponent))
+        self.logger.info('state: {}, grid_status: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(self.state.name, grid_status.name, ts_prop.name, hurst_exponent))
 
         '''
             When state is STOP, return
         '''
-        if self.state == STATE.STOP.name:            
+        if self.state == STATE.STOP:            
             return           
 
         '''
             When state is RUN, grid status is IDLE and time-series is not random => place grid orders            
         '''
-        if self.state == STATE.RUN.name and grid_status == GRID_STATUS.IDLE and ts_prop != TS_PROP.RANDOM:            
+        if self.state == STATE.RUN and grid_status == GRID_STATUS.IDLE and ts_prop != TS_PROP.RANDOM:            
             center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
             current_vol = vol
             current_px = open if self.is_backtest() else close
@@ -253,13 +267,13 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         '''
             Check the close price and determine if we need stop loss        
+            for real trading, we don't need a actual price for stoploss
         '''        
         if grid_status == GRID_STATUS.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1]):                         
             stop_px = self.stoploss[0] if close < self.stoploss[0] else self.stoploss[1]
             stop_px = round(stop_px, self.price_decimal)
             self.logger.info('stop loss are triggered at {}.'.format(stop_px))
-
-            # for real trading, we don't need a actual price for stoploss
+            
             stop_px = stop_px if self.is_backtest() else None            
             self.cancel_all_orders()
             self.close_out_positions('stoploss', stop_px, date)
@@ -268,10 +282,10 @@ class GridArithmeticStrategy(StrategyPerformance):
             If state is terminate, cancel all orders and close out the positions
             Update state to STOP so the strategy won't run
         '''        
-        if self.state == STATE.TERMINATE.name:
+        if self.state == STATE.TERMINATE:
             self.cancel_all_orders()                        
             self.close_out_positions('close', None, None, force=True)
-            self.state = STATE.STOP.name
+            self.state = STATE.STOP
             ExecuteSetup(self.strategy_id).update("state", STATE.STOP.name)
 
     def get_grid_status(self) -> GRID_STATUS:
@@ -386,7 +400,6 @@ class GridArithmeticStrategy(StrategyPerformance):
                 self.grid_id = last_grid_id
 
         else:
-
             last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]  
             filled = last_grid[last_grid['status'] == 'FILLED']
 
