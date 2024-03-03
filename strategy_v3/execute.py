@@ -15,6 +15,8 @@ from binance.exceptions import BinanceAPIException
 
 warnings.filterwarnings('ignore')
 
+# /usr/local/bin/python3 /Users/lok419/Desktop/JupyterLab/Trading/strategy_v3/execute.py SOLv1
+
 def sanity_check_data(df: DataFrame, data: dict):
     '''
         Sanity check the input data and make sure data are latest
