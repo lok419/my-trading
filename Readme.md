@@ -5,7 +5,7 @@ Here is my own trading research on everything I interested. This involves lots o
 
 All of the codes here are not just reasearch, but it is designed to be actual executable strategy (might or might not profitable) with systematic risk control. Some of them are stil working, some of them are abandoned.
 
-Here I have strategy v1, v2, v3 here. Each of them has a different trading framework designed for specific trading. Here I will briefly describe what is it doing.
+Here I have strategy v1, v2, v3 here. Each of them has a different trading framework designed for specific purpose. Here I will briefly describe what i'm doing.
 
 # Strategy v1 (abandoned for now)
 
