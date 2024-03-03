@@ -23,6 +23,10 @@ def handler_print(func):
     async def inner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.message:
             logger.info(f"[{update.message.from_user.username}] {update.message.text}")
+
+        elif update.effective_chat and update.callback_query:
+            logger.info(f"[{update.effective_chat.username}] {update.callback_query.data}")
+
         await func(update=update, context=context)
 
     return inner
@@ -40,15 +44,15 @@ def handler_expcetion(func):
             await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
     return inner
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update_: Update, context: ContextTypes.DEFAULT_TYPE):
     '''
         This is the callback whenever user clicks the button
     '''
-    data = update.callback_query.data    
+    data = update_.callback_query.data    
     command = data.split(" ")[0].replace('/', '')
-    context.args = data.split(" ")[1:]    
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=data)    
-    await eval(command)(update, context)
+    context.args = data.split(" ")[1:]        
+    await context.bot.send_message(chat_id=update_.effective_chat.id, text=data)    
+    await eval(command)(update_, context)
 
 @handler_expcetion
 @handler_print
@@ -69,7 +73,14 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     s = context.args[0]
     button_list = []    
     button_list.append([InlineKeyboardButton(text='Back', callback_data=f'/start')]) 
-    button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])    
+    button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])  
+    button_list.append([
+        InlineKeyboardButton(text='Run', callback_data=f'/update {s} status RUN'),
+        InlineKeyboardButton(text='Pause', callback_data=f'/update {s} status PAUSE'), 
+        InlineKeyboardButton(text='Terminate', callback_data=f'/update {s} status TERMINATE'),
+        InlineKeyboardButton(text='Stop', callback_data=f'/update {s} status STOP'),        
+    ])
+
     times = ['2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago']
     for t in times:
         button_list.append([InlineKeyboardButton(text=t, callback_data='/')])

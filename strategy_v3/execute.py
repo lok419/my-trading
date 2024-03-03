@@ -26,11 +26,14 @@ def sanity_check_data(df: DataFrame, data: dict):
 
 def update_strategy_params(strategy: GridArithmeticStrategy, strategy_setup: ExecuteSetup):
     '''
-        This allow user to update the strategy parameters on the fly by changing the execute_setup.json
+        This allow user to update the strategy parameters on the fly by changing the execute_setup.json        
     '''
     strategy_params = strategy_setup.read()
     for key, value in strategy_params.items():
-        value_org = getattr(strategy, key)
+        value_org = getattr(strategy, key)        
+        # Exceptional case on status as this is an ENUM but we stored as string, we need cast it to string before comparison
+        value_org = value_org.name if key == 'status' else value_org
+        
         if value != value_org:
             strategy.logger.info(f'update {key} from {value_org} to {value}')
             setattr(strategy, key, value)
@@ -50,16 +53,13 @@ if __name__ == '__main__':
         while True:    
             try:                
                 update_strategy_params(strategy, strategy_setup)
-                
-                if strategy.position_size > 0:
-                    # 360 data points
-                    strategy.load_data('1 Days Ago')                                
-                    df = strategy.df
-                    data = df.iloc[-1]                
-                    sanity_check_data(df, data)            
-                    strategy.execute(data)    
-                else:
-                    strategy.logger.info('position size is 0 and strategy is puased....')
+                                
+                # 360 data points
+                strategy.load_data('1 Days Ago')                                
+                df = strategy.df
+                data = df.iloc[-1]                
+                sanity_check_data(df, data)            
+                strategy.execute(data)    
 
                 sleep(60)
 

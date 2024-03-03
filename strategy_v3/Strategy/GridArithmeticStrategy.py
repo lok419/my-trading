@@ -54,8 +54,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold        
         self.qty_decimal = qty_decimal
-        self.price_decimal = price_decimal
-        self.status = status
+        self.price_decimal = price_decimal        
 
         # this saves the current grid stats
         self.grid_id = 0
@@ -82,6 +81,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         # grid type name acronym map
         self.grid_char_to_type = {''.join([s[0] for s in x.split('_')]): x for x in GRID_TYPE._member_names_}
         self.grid_type_to_char = {x: ''.join([s[0] for s in x.split('_')]) for x in GRID_TYPE._member_names_}
+        self.status = status
 
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
@@ -91,7 +91,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         return self._status
     
     @status.setter
-    def status(self, status: str|STATUS):
+    def status(self, status: str|STATUS):        
         if type(status) is STATUS:
             self._status = status
         else:
