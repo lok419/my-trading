@@ -187,20 +187,21 @@ class StrategyPerformance(object):
             display(df_pnl_metrics)
 
         fig = make_subplots(
-            rows=4, cols=1, 
+            rows=5, cols=1, 
             shared_xaxes=True, 
             vertical_spacing=0.05,             
             subplot_titles=[
                 'Price OHLC',     
-                'Cumulated PnL / Return (%)',        
+                'Cumulated PnL / Return (%)', 
+                f'Average True Range / Close Std ({self.vol_lookback} x {self.interval})',
                 'Half Life',
                 'Hurst Exponent',                
             ],         
-            row_heights=[0.8, 0.2, 0.2, 0.2],  
+            row_heights=[0.8, 0.2, 0.2, 0.2, 0.2],  
         )
         fig.update_layout(
             title=self.instrument,
-            width=1500, height=1300,        
+            width=1500, height=1600,        
             hovermode='x',
         )        
 
@@ -280,9 +281,11 @@ class StrategyPerformance(object):
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_gross_cum"], name='Cumulative Gross PnL (Fiat)', visible='legendonly'), row=2, col=1)
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["trading_fee_cum"], name='Cumulative Trading Fee (Fiat)', visible='legendonly'), row=2, col=1)
 
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['atr'], name='Average True Range'), row=3,col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['close_std'], name='Close Std'), row=3,col=1)
 
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['half_life'], showlegend=False), row=3,col=1)
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=4,col=1)        
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['half_life'], showlegend=False), row=4,col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=5,col=1)        
 
         if len(save_jpg_path) == 0:
             fig.show()

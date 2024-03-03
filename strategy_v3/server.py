@@ -69,8 +69,8 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     s = context.args[0]
     button_list = []    
     button_list.append([InlineKeyboardButton(text='Back', callback_data=f'/start')]) 
-    button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])
-    times = ['2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago']
+    button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])    
+    times = ['2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago']
     for t in times:
         button_list.append([InlineKeyboardButton(text=t, callback_data='/')])
         button_list.append([

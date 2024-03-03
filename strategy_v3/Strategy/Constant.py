@@ -14,3 +14,8 @@ class GRID_TYPE(Enum):
     MEAN_REVERT = 0
     MOMENTUM_UP = 1
     MOMENTUM_DOWN = 2
+
+class ACTION(Enum):
+    RUN = 0
+    PAUSE = 1
+    TERMINATE = 2
