@@ -19,4 +19,4 @@ class STATUS(Enum):
     RUN = 0
     PAUSE = 1
     TERMINATE = 2
-    STOP = 4
+    STOP = 3
