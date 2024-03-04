@@ -277,7 +277,7 @@ class GridArithmeticStrategy(StrategyPerformance):
             
             stop_px = stop_px if self.is_backtest() else None            
             self.cancel_all_orders()
-            self.close_out_positions('stoploss', stop_px, date)
+            self.close_out_positions('stoploss', stop_px, date, force=True)
 
         '''
             If status is terminate, cancel all orders and close out the positions
@@ -389,16 +389,12 @@ class GridArithmeticStrategy(StrategyPerformance):
             Force to flatten all delta based on LTD orders
         '''
         if force:            
-            filled = all_orders[all_orders['status'] == 'FILLED']            
-
-            last_grid_type = all_orders.iloc[-1]['grid_type']
-            last_grid_id = all_orders.iloc[-1]['grid_id']
-
+            filled = all_orders[all_orders['status'] == 'FILLED']
             if self.grid_type is None:
-                self.grid_type = GRID_TYPE[last_grid_type]
+                self.grid_type = GRID_TYPE[all_orders.iloc[-1]['grid_type']]
 
             if self.grid_id is None:
-                self.grid_id = last_grid_id
+                self.grid_id = all_orders.iloc[-1]['grid_id']
 
         else:
             last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]  
