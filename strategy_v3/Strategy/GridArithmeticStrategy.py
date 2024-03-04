@@ -161,6 +161,8 @@ class GridArithmeticStrategy(StrategyPerformance):
         '''
 
         df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)        
+        df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
+
         df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(1)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
         df['hurst_exponent_avg'] = df["hurst_exponent"].rolling(self.vol_lookback).mean()
@@ -171,8 +173,7 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         df[['Close_t5', 'Low_t5', 'High_t5']] = df[['Close', 'Low', 'High']].shift(5)
         df[['Close_t10', 'Low_t10', 'High_t10']] = df[['Close', 'Low', 'High']].shift(10)
-        df[['Close_t20', 'Low_t20', 'High_t20']] = df[['Close', 'Low', 'High']].shift(20)              
-        df['Close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)        
+        df[['Close_t20', 'Low_t20', 'High_t20']] = df[['Close', 'Low', 'High']].shift(20)                     
 
         # set start date based on loaded data
         self.start_date = df['Date'].min()
@@ -445,22 +446,26 @@ class GridArithmeticStrategy(StrategyPerformance):
             ts_prop     price-series property
         '''
         current_px = data['Open'] if self.is_backtest() else data['Close']                
+        close_sma = data['close_sma']
         current_vol = data['atr']      
-
-        if ts_prop == TS_PROP.MEAN_REVERT:
-            center_px = current_px
-            stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
-            grid_type = GRID_TYPE.MEAN_REVERT
+        center_px = stoploss = grid_type = None
+        
+        if ts_prop == TS_PROP.MEAN_REVERT:            
+            # make sure the current price are same as moving average
+            if current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale:
+                center_px = current_px
+                stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
+                grid_type = GRID_TYPE.MEAN_REVERT
 
         elif ts_prop == TS_PROP.MOMENTUM:    
             # conservative approach on momentum filters
-            if current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:                            
+            if current_px > close_sma and current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:                            
                 '''
                     Momentum Up Order
                         Upper Bound = same as mean revert. vol_grid_scale references to center price
                         Lower Bound = need to make sure it won't trigger immediately. reference to 
                             1. current price and 
-                            2. vol_stoploss_scale minus grid_size minus => this is derivation tolerance from the grid boundary
+                            2. vol_stoploss_scale => this is derivation tolerance from the grid boundary
                 '''
                 center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale                      
                 stoploss = (
@@ -469,12 +474,12 @@ class GridArithmeticStrategy(StrategyPerformance):
                 )                
                 grid_type = GRID_TYPE.MOMENTUM_UP                
 
-            elif current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:            
+            elif current_px < close_sma and current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:            
                 '''
                     Momentum Down Order
                         Upper Bound = need to make sure it won't trigger immediately. reference to                         
                             1. current price and 
-                            2. vol_stoploss_scale minus grid_size minus => this is derivation tolerance from the grid boundary
+                            2. vol_stoploss_scale => this is derivation tolerance from the grid boundary
                         Lower Bound = same as mean revert. vol_grid_scale references to center price
                 '''
                 center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
@@ -483,10 +488,6 @@ class GridArithmeticStrategy(StrategyPerformance):
                     current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale
                 )
                 grid_type = GRID_TYPE.MOMENTUM_DOWN
-            else:
-                center_px = stoploss = grid_type = None
-        else:
-            center_px = stoploss = grid_type = None
 
         return center_px, stoploss, grid_type
 
