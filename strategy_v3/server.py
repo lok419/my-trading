@@ -20,7 +20,7 @@ default_update_options = {
     'grid_size': [3,5,7,10],
     'vol_lookback': [10, 15, 20, 30, 40, 60],
     'vol_grid_scale': [0.05, 0.1, 0.15, 0.2, 0.25, 0.3 ,0.4],
-    'vol_stoploss_scale': [7,8,9,10],
+    'vol_stoploss_scale': [1,2,3,4,5],
     'position_size': [50, 100, 300, 500, 1000],
     'hurst_exp_mr_threshold': [0, 0.4, 0.5, 0.6],
     'hurst_exp_mo_threshold': [0.6, 0.7, 0.8, 1],

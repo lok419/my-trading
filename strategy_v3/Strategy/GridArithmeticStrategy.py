@@ -36,7 +36,7 @@ class GridArithmeticStrategy(StrategyPerformance):
             grid_size:              Size of the Grid, this refers to one directional, i.e. if grids size = 5, that means 5 buy ordes + 5 sell orders
             vol_lookback:           Lookback period to determine the historical volatility
             vol_grid_size:          Grid spacing in terms of historical volatility
-            vol_stoploss_scale:     Stoploss distance from center of the grids in terms of historical volatility
+            vol_stoploss_scale:     Stoploss distance from edge of the grids in terms of historical volatility
             position_size:          Position for each orders in terms of $USD
             hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade
             price_decimal:          rounding decimal of price
@@ -449,7 +449,7 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         if ts_prop == TS_PROP.MEAN_REVERT:
             center_px = current_px
-            stoploss = (center_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale, center_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale)
+            stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
             grid_type = GRID_TYPE.MEAN_REVERT
 
         elif ts_prop == TS_PROP.MOMENTUM:    
@@ -464,10 +464,10 @@ class GridArithmeticStrategy(StrategyPerformance):
                 '''
                 center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale                      
                 stoploss = (
-                    current_px - (self.vol_stoploss_scale - self.grid_size) * current_vol * self.vol_grid_scale,
-                    center_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale
+                    current_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale,
+                    center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale
                 )                
-                grid_type = GRID_TYPE.MOMENTUM_UP
+                grid_type = GRID_TYPE.MOMENTUM_UP                
 
             elif current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:            
                 '''
@@ -479,8 +479,8 @@ class GridArithmeticStrategy(StrategyPerformance):
                 '''
                 center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
                 stoploss = (
-                    center_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale,
-                    current_px + (self.vol_stoploss_scale - self.grid_size) * current_vol * self.vol_grid_scale
+                    center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale,
+                    current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale
                 )
                 grid_type = GRID_TYPE.MOMENTUM_DOWN
             else:
