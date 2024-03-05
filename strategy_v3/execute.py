@@ -2,6 +2,7 @@ import pandas as pd
 import warnings
 import sys
 import json
+import traceback
 from pandas.core.frame import DataFrame
 from strategy_v3.Strategy import GridArithmeticStrategy
 from strategy_v3.Executor import ExecutorBinance
@@ -77,12 +78,14 @@ if __name__ == '__main__':
                 else:
                     raise(e)                                
 
-    except KeyboardInterrupt as e:        
+    except KeyboardInterrupt as e:  
+        traceback.print_exc()      
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
         strategy.close_out_positions()
 
     except Exception as e:
+        traceback.print_exc()
         strategy.logger.error(e)        
         strategy.cancel_all_orders()
         strategy.close_out_positions()
