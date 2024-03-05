@@ -1,19 +1,14 @@
-from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
-from strategy_v3.DataLoader import DataLoaderModel
-from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATUS
+from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATUS, StrategyBase
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
-from utils.logging import get_logger
 from pandas.core.frame import DataFrame
-from zoneinfo import ZoneInfo
 import pandas as pd
 import numpy as np
-import random
 import math
 import re
 
-class GridArithmeticStrategy(StrategyPerformance):
+class GridArithmeticStrategy(StrategyBase, StrategyPerformance):
 
     def __init__(self, 
                  instrument:str, 
@@ -44,8 +39,15 @@ class GridArithmeticStrategy(StrategyPerformance):
             status:                 user can set status to control the strategy behavior
             verbose:                True to print the log message
         '''
-        self.instrument = instrument
-        self.interval = interval
+        super().__init__(
+            instrument=instrument,
+            interval=interval,
+            price_decimal=price_decimal,
+            qty_decimal=qty_decimal,
+            status=status,
+            verbose=verbose,
+        )        
+        
         self.grid_size = grid_size        
         self.vol_lookback = vol_lookback
         self.vol_grid_scale = vol_grid_scale
@@ -53,69 +55,18 @@ class GridArithmeticStrategy(StrategyPerformance):
         self.position_size = position_size
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold        
-        self.qty_decimal = qty_decimal
-        self.price_decimal = price_decimal        
 
         # this saves the current grid stats
         self.grid_id = 0
         self.grid_type = None
-
-        self.stoploss = (float('-inf'), float('inf'))
-        self.executor = None
-        self.data_loader = None
-
-        # strategy_id is used to identify the strategy from list of orders
-        self.strategy_id = str(round(random.random() * 1e6))
-        self.logger = get_logger(self.__str__())
-
-        # 5m -> 5mins for round function
-        self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
-        self.interval_min = int(self.interval.replace('m', ''))
-
-        if not verbose:
-            self.logger.setLevel('CRITICAL')
-
-        self.execute_start_time = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
-        self.start_date = None
+        self.stoploss = (float('-inf'), float('inf'))                
 
         # grid type name acronym map
         self.grid_char_to_type = {''.join([s[0] for s in x.split('_')]): x for x in GRID_TYPE._member_names_}
-        self.grid_type_to_char = {x: ''.join([s[0] for s in x.split('_')]) for x in GRID_TYPE._member_names_}
-        self.status = status
+        self.grid_type_to_char = {x: ''.join([s[0] for s in x.split('_')]) for x in GRID_TYPE._member_names_}        
 
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
-    
-    @property
-    def status(self) -> STATUS:
-        return self._status
-    
-    @status.setter
-    def status(self, status: str|STATUS):        
-        if type(status) is STATUS:
-            self._status = status
-        else:
-            try:
-                self._status = STATUS._member_map_[status]
-            except:
-                self.logger.error(f'unknown status {status}...')
-
-    def set_executor(self, executor:ExecutorModel):
-        '''
-            Define a executor object which executes all trading operation
-            We need to make sure both executor and data_loader has the same timezone
-                - For Binance, it is based on UTC time (i.e. GMT+0)                        
-        '''
-        self.executor = executor
-        self.executor.set_logger(self.logger)
-
-    def set_data_loder(self, data_loader:DataLoaderModel):
-        '''
-            Defines a dataload object which sources all OHCL data
-            We need to make sure both executor and data_loader has the same timezone
-                - For Binance, it is based on UTC time (i.e. GMT+0)
-        '''
-        self.data_loader = data_loader
 
     def set_strategy_id(self, 
                         id:str,
@@ -123,16 +74,13 @@ class GridArithmeticStrategy(StrategyPerformance):
                         ):
         '''
             Set strategy id. this is used to identify the orders from same strategy instance
-
             id:     The strategy name
             reload: True to reload all previous property (e.g. grid_id, grid_type) from latest
         '''
-        self.strategy_id = id
-        self.logger.name = self.__str__()    
+        super().set_strategy_id(id)
 
         if reload and not self.is_backtest():
             df_orders = self.get_all_orders(limit=10)
-
             if len(df_orders) > 0:
                 grid_type = df_orders.iloc[-1]['grid_type']
                 grid_id = df_orders.iloc[-1]['grid_id']
@@ -143,14 +91,9 @@ class GridArithmeticStrategy(StrategyPerformance):
                 if self.grid_id == 0:
                     self.grid_id = grid_id
 
-    def is_backtest(self):
-        return type(self.executor) is ExecutorBacktest
-    
-    def get_current_time(self) -> datetime:
-        return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
-
     def load_data(self, lookback):
-        df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)                
+        super().load_data(lookback)        
+        df = self.df
         
         '''
             for backtest, we cannot use close price for the same interval as this implies lookahead bias
@@ -217,7 +160,6 @@ class GridArithmeticStrategy(StrategyPerformance):
 
             data: structure contains all required data for strategy
         '''
-
         date = data['Date']
         hurst_exponent = data['hurst_exponent']
         open, close, high, low = data['Open'], data['Close'], data['High'], data['Low']            
@@ -355,17 +297,6 @@ class GridArithmeticStrategy(StrategyPerformance):
 
         return has_filled and has_pending and abs(filled_net_qty) == 0
     
-    def is_delta_neutral(self) -> bool:
-        '''
-            Check if delta neutral by querying all orders
-        '''
-        all_orders = self.get_all_orders(query_all=True)    
-        filled = all_orders[all_orders['status'] == 'FILLED']
-        filled_net_qty = filled['NetExecutedQty'].sum()   
-        filled_net_qty = round(filled_net_qty, self.qty_decimal)
-
-        return abs(filled_net_qty) == 0
-    
     def close_out_positions(self,                                                         
                             type:str = 'close',
                             price: float = None,
@@ -374,6 +305,7 @@ class GridArithmeticStrategy(StrategyPerformance):
                             ):
         '''
             Close out all outstanding positions based on Grid orders
+
             type:  reason of the close out. Either stoploss or close (end of strategy)
             price: only for backtest, MARKET ORDER does not need price
             date:  only used for backtest
@@ -383,7 +315,7 @@ class GridArithmeticStrategy(StrategyPerformance):
         all_orders = self.get_all_orders(query_all=force)    
 
         if not self.is_backtest() and not force:                          
-            all_orders = all_orders[all_orders['time'] > self.execute_start_time]                    
+            all_orders = all_orders[all_orders['time'] > self.execute_start_time]           
 
         '''
             Force to flatten all delta based on LTD orders
@@ -559,13 +491,11 @@ class GridArithmeticStrategy(StrategyPerformance):
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
-
             query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
         '''
-        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit)
-        df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
-
+        df_orders = super().get_all_orders(query_all=query_all, trade_details=trade_details, limit=limit)
+                
         # some manual adjusting on orders id
         df_orders['clientOrderId'] = np.where(df_orders['orderId'] == 249865056, 'grid_SOLFDUSDv1_gridid4_MD_close', df_orders['clientOrderId'])
 
@@ -585,14 +515,4 @@ class GridArithmeticStrategy(StrategyPerformance):
                 return ''              
         df_orders['grid_type'] = df_orders['clientOrderId'].apply(grid_type_find)          
 
-        return df_orders
-    
-    def cancel_all_orders(self):
-        '''
-            Cancel all orders created traded by this object
-        '''                                
-        self.logger.info('cancelling all orders.....')
-        df_orders = self.get_all_orders()
-        df_orders = df_orders[df_orders['status'] != 'FILLED']                
-        df_orders = df_orders[df_orders['status'] != 'CANCELED']
-        self.executor.cancel_order(self.instrument, df_orders)      
+        return df_orders    
