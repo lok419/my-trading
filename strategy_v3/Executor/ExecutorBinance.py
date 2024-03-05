@@ -61,7 +61,14 @@ class ExecutorBinance(ExecutorModel):
                      df_orders:DataFrame):
         order_id = df_orders['orderId'].values        
         for id in order_id:
-            self.binance.cancel_order(instrument, id)        
+            try:
+                self.binance.cancel_order(instrument, id)        
+            except BinanceAPIException as e:
+                self.logger.error(e)
+                if e.code == -2011:            
+                    self.logger.error(f'error when canceling order {id}...')
+                else:
+                    raise(e)
         
     def get_all_orders(self, instrument:str, **params):        
         df_orders = self.binance.get_all_orders(instrument, **params)                        
