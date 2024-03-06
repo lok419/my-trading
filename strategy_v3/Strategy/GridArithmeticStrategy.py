@@ -118,9 +118,6 @@ class GridArithmeticStrategy(StrategyBase, StrategyPerformance):
         df[['Close_t10', 'Low_t10', 'High_t10']] = df[['Close', 'Low', 'High']].shift(10)
         df[['Close_t20', 'Low_t20', 'High_t20']] = df[['Close', 'Low', 'High']].shift(20)                     
 
-        # set start date based on loaded data
-        self.start_date = df['Date'].min()
-
         # compute rolling metrics based on time-series half-life
         std_hl = []
         close_hl = []

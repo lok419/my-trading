@@ -17,7 +17,8 @@ class StrategyBase(StrategyModel):
                  price_decimal: int = 2,
                  qty_decimal: int = 5,     
                  status: str = STATUS.RUN,
-                 verbose: bool = True,            
+                 start_date: str = None,
+                 verbose: bool = True,                        
         ):
         '''
             instrument:             The instrument to trade
@@ -25,12 +26,14 @@ class StrategyBase(StrategyModel):
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
+            start_date:             Indicate the start time of the strategy so that we can extract the whole performance history of a strategy
             verbose:                True to print the log message
         '''
         self.instrument = instrument
         self.interval = interval              
         self.qty_decimal = qty_decimal
-        self.price_decimal = price_decimal        
+        self.price_decimal = price_decimal   
+        self.start_date = start_date     
 
         self.executor = None
         self.data_loader = None
@@ -46,9 +49,7 @@ class StrategyBase(StrategyModel):
         # 5m -> 5mins for round function
         self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
         self.interval_min = int(self.interval.replace('m', ''))
-
-        self.execute_start_time = self.get_current_time()
-        self.start_date = None        
+        self.execute_start_time = self.get_current_time()        
         
     def __str__(self):
         return '{}_{}'.format("".join([x for x in self.__class__.__name__ if x.isupper()]), self.strategy_id)
@@ -65,7 +66,21 @@ class StrategyBase(StrategyModel):
             try:
                 self._status = STATUS._member_map_[status]
             except:
-                self.logger.error(f'unknown status {status}...')
+                self.logger.error(f'unknown status {status}...')    
+
+    @property
+    def start_date(self) -> datetime:
+        return self._start_date
+    
+    @start_date.setter
+    def start_date(self, start_date: str|datetime):
+        if type(start_date) is datetime:
+            self._start_date = start_date
+        else:
+            try:
+                self._start_date = datetime.strptime(start_date)
+            except:
+                pass    
 
     def set_executor(self, executor:ExecutorModel):
         '''
@@ -102,8 +117,11 @@ class StrategyBase(StrategyModel):
         return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
 
     def load_data(self, lookback):
+        if lookback is None or lookback == '':
+            lookback = self.start_date.strftime('%Y-%m-%d %H:%M:%S')
+
         df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)
-        self.df = df                 
+        self.df = df   
 
     def execute(self, data):
         pass    

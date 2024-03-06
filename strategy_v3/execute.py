@@ -35,7 +35,8 @@ def update_strategy_params(strategy: StrategyModel, strategy_setup: ExecuteSetup
     '''
     strategy_params = strategy_setup.read()
     for key, value in strategy_params.items():
-        value_org = getattr(strategy, key)        
+        value_org = getattr(strategy, key)    
+            
         # Exceptional case on status as this is an ENUM but we stored as string, we need cast it to string before comparison
         value_org = value_org.name if key == 'status' else value_org
         
