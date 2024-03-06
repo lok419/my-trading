@@ -23,6 +23,7 @@ class GridArithmeticStrategy(StrategyBase, StrategyPerformance):
                  price_decimal: int = 2,
                  qty_decimal: int = 5,                             
                  status: str = STATUS.RUN,
+                 start_date: str = None,
                  verbose: bool = True,                 
         ):
         '''
@@ -37,6 +38,7 @@ class GridArithmeticStrategy(StrategyBase, StrategyPerformance):
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
+            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy
             verbose:                True to print the log message
         '''
         super().__init__(
@@ -45,6 +47,7 @@ class GridArithmeticStrategy(StrategyBase, StrategyPerformance):
             price_decimal=price_decimal,
             qty_decimal=qty_decimal,
             status=status,
+            start_date=start_date,
             verbose=verbose,
         )        
         

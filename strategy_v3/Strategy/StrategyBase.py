@@ -26,7 +26,7 @@ class StrategyBase(StrategyModel):
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
-            start_date:             Indicate the start time of the strategy so that we can extract the whole performance history of a strategy
+            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy
             verbose:                True to print the log message
         '''
         self.instrument = instrument
@@ -78,9 +78,12 @@ class StrategyBase(StrategyModel):
             self._start_date = start_date
         else:
             try:
-                self._start_date = datetime.strptime(start_date)
+                self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
             except:
-                pass    
+                try:
+                    self._start_date = datetime.strptime(start_date, '%Y-%m-%d')
+                except:
+                    self._start_date = None                    
 
     def set_executor(self, executor:ExecutorModel):
         '''
