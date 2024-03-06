@@ -1,10 +1,9 @@
 import pandas as pd
 import warnings
 import sys
-import json
 import traceback
 from pandas.core.frame import DataFrame
-from strategy_v3.Strategy import GridArithmeticStrategy
+from strategy_v3.Strategy import GridArithmeticStrategy, StrategyModel
 from strategy_v3.Executor import ExecutorBinance
 from strategy_v3.DataLoader import DataLoaderBinance
 from strategy_v3.ExecuteSetup import ExecuteSetup
@@ -12,7 +11,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from time import sleep
 from requests.exceptions import Timeout
-from binance.exceptions import BinanceAPIException 
+from binance.exceptions import BinanceAPIException
+from strategy_v3.Misc import CustomException
 
 warnings.filterwarnings('ignore')
 
@@ -25,9 +25,11 @@ def sanity_check_data(df: DataFrame, data: dict):
     dt_now = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
     interval = df['Date'].diff().iloc[-1].seconds
     since_last = (dt_now - data['Date']).seconds
-    assert since_last <= interval
 
-def update_strategy_params(strategy: GridArithmeticStrategy, strategy_setup: ExecuteSetup):
+    if since_last >= interval:
+        raise CustomException(f'data last updated time is more than {interval}')
+
+def update_strategy_params(strategy: StrategyModel, strategy_setup: ExecuteSetup):
     '''
         This allow user to update the strategy parameters on the fly by changing the execute_setup.json        
     '''
@@ -76,7 +78,11 @@ if __name__ == '__main__':
                     strategy.logger.error('handled explicitly. retring....')
                     sleep(30)
                 else:
-                    raise(e)                                
+                    raise(e)    
+                
+            except CustomException as e:
+                strategy.logger.error(e)    
+                strategy.logger.error('retrying.....')                      
 
     except KeyboardInterrupt as e:  
         traceback.print_exc()      

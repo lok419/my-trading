@@ -251,6 +251,8 @@ Strategy runs 247, and we can't stay in front of the computer all the days. Ther
 
 - add interrupt function to strategy: RUN, PAUSE, TERMINATE, STOP
 
+2024-03-06: started to implementing a new market making strategy
+
 ## TODO
 
 - enhance backtest fill logic, high and low price are likely unfill-able in reality, we need to account for that
