@@ -74,24 +74,25 @@ if __name__ == '__main__':
 
             except BinanceAPIException as e:
                 strategy.logger.error(e)                
-                if e.code == '-1021':
+                if e.code == -1021:
                     strategy.logger.error('handled explicitly. retring....')
                     sleep(30)
+
                 else:
                     raise(e)    
-                
+                                
             except CustomException as e:
                 strategy.logger.error(e)    
                 strategy.logger.error('retrying.....')                      
 
-    except KeyboardInterrupt as e:  
-        traceback.print_exc()      
+    except KeyboardInterrupt as e:          
         strategy.logger.error(e)        
+        strategy.logger.error(e.with_traceback)        
         strategy.cancel_all_orders()
         strategy.close_out_positions()
 
-    except Exception as e:
-        traceback.print_exc()
+    except Exception as e:                
         strategy.logger.error(e)        
+        strategy.logger.error(e.with_traceback())
         strategy.cancel_all_orders()
         strategy.close_out_positions()
