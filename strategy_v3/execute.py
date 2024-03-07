@@ -71,10 +71,12 @@ if __name__ == '__main__':
                 sleep(60)
 
             except Timeout as e:
+                traceback.print_exception(e)
                 strategy.logger.error(e)        
                 strategy.logger.error('handled explicitly. retring....')
 
             except BinanceAPIException as e:
+                traceback.print_exception(e)
                 strategy.logger.error(e)                
                 if e.code == -1021:
                     strategy.logger.error('handled explicitly. retring....')
@@ -84,17 +86,18 @@ if __name__ == '__main__':
                     raise(e)    
                                 
             except CustomException as e:
+                traceback.print_exception(e)
                 strategy.logger.error(e)    
                 strategy.logger.error('retrying.....')                      
 
-    except KeyboardInterrupt as e:          
-        strategy.logger.error(e)        
-        strategy.logger.error(e.with_traceback)        
+    except KeyboardInterrupt as e:    
+        traceback.print_exception(e)      
+        strategy.logger.error(e)                
         strategy.cancel_all_orders()
         strategy.close_out_positions()
 
-    except Exception as e:                
-        strategy.logger.error(e)        
-        strategy.logger.error(e.with_traceback())
+    except Exception as e:   
+        traceback.print_exception(e)             
+        strategy.logger.error(e)                
         strategy.cancel_all_orders()
         strategy.close_out_positions()
