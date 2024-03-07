@@ -26,7 +26,7 @@ class StrategyBase(StrategyModel):
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
-            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy
+            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. By default, the time is based on UTC
             verbose:                True to print the log message
         '''
         self.instrument = instrument
@@ -79,11 +79,8 @@ class StrategyBase(StrategyModel):
         else:
             try:
                 self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
-            except:
-                try:
-                    self._start_date = datetime.strptime(start_date, '%Y-%m-%d')
-                except:
-                    self._start_date = None                    
+            except:            
+                self._start_date = None                    
 
     def set_executor(self, executor:ExecutorModel):
         '''
@@ -119,12 +116,20 @@ class StrategyBase(StrategyModel):
     def get_current_time(self) -> datetime:
         return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
 
-    def load_data(self, lookback):
+    def load_data(self, lookback) -> DataFrame:
         if lookback is None or lookback == '':
             lookback = self.start_date.strftime('%Y-%m-%d %H:%M:%S')
 
         df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)
-        self.df = df   
+        self.df = df
+        return self.df
+
+    def get_order_book(self, limit: float=1000) -> tuple[DataFrame, DataFrame]:
+        '''
+            Load order book data
+        '''  
+        self.df_bids, self.df_asks = self.executor.get_order_book(self.instrument, limit=limit) 
+        return self.df_bids, self.df_asks
 
     def execute(self, data):
         pass    
@@ -132,7 +137,8 @@ class StrategyBase(StrategyModel):
     def close_out_positions(self,                                                         
                             type:str = 'close',
                             price: float = None,
-                            date:datetime = None,                            
+                            order_id: str = None,                         
+                            date:datetime = None,                             
                             ):
         '''
             Generic function to close out all outstanding positions
@@ -153,7 +159,9 @@ class StrategyBase(StrategyModel):
             if price is not None:
                 price = round(price, self.price_decimal)
         
-            order_id = f'{self.__str__()}_{type}'
+            if order_id is None:
+                order_id = f'{self.__str__()}_{type}'
+
             side = 'BUY' if filled_net_qty < 0 else 'SELL'
             quantity = abs(filled_net_qty)
             self.executor.place_order(
@@ -168,23 +176,30 @@ class StrategyBase(StrategyModel):
                 stopPrice=None,
             )
         else:
-            self.logger.info('nothing to close out because of no oustanding positions....'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
+            self.logger.info('nothing to close out because of no oustanding positions....')
         
     
     def is_delta_neutral(self) -> bool:
         '''
             Check if delta neutral by querying all orders
         '''
+        net_pos = self.get_current_position()
+        return abs(net_pos) == 0
+    
+    def get_current_position(self) -> float:
+        '''
+            Get current net position
+        '''
         all_orders = self.get_all_orders(query_all=True)    
         filled = all_orders[all_orders['status'] == 'FILLED']
         filled_net_qty = filled['NetExecutedQty'].sum()   
         filled_net_qty = round(filled_net_qty, self.qty_decimal)
-        return abs(filled_net_qty) == 0
+        return filled_net_qty
                         
     def get_all_orders(self, 
                        query_all: bool = False,
                        trade_details: bool = False,     
-                       limit: int = 1000,                                         
+                       limit: int = 1000,                                                                
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
@@ -193,16 +208,20 @@ class StrategyBase(StrategyModel):
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
             limit:          orders to retrieve
         '''
-        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit)
+        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit, start_date=self.start_date)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
         return df_orders        
     
-    def cancel_all_orders(self):
+    def cancel_all_orders(self, limit: int=1000, silence: bool=False):
         '''
             Cancel all orders created traded by this object
-        '''                                
-        self.logger.info('cancelling all orders.....')
-        df_orders = self.get_all_orders()
+
+            Limit:  orders limit when we search the orders
+        '''    
+        if not silence:                            
+            self.logger.info('cancelling all orders.....')
+            
+        df_orders = self.get_all_orders(limit = limit)
         df_orders = df_orders[df_orders['status'] != 'FILLED']                
         df_orders = df_orders[df_orders['status'] != 'CANCELED']
-        self.executor.cancel_order(self.instrument, df_orders)      
+        self.executor.cancel_order(self.instrument, df_orders)                

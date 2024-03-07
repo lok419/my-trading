@@ -94,6 +94,12 @@ class ExecutorBinance(ExecutorModel):
         df_orders['trading_fee'] = df_orders['trading_fee'].astype(float)
 
         return df_orders
+    
+    def get_order_book(self, instrument, limit: float=1000) -> tuple[DataFrame, DataFrame]:
+        '''
+            Get Live Order book from binance
+        '''
+        return self.binance.get_order_book(instrument=instrument, limit=limit)
 
 
         

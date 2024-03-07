@@ -104,4 +104,6 @@ class ExecutorBacktest(ExecutorModel):
         df_orders['trading_fee'] = df_orders['trading_fee'].astype(float)
 
         return df_orders
-
+    
+    def get_order_book(self, instrument) -> tuple[DataFrame, DataFrame]:
+        pass

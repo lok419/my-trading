@@ -55,13 +55,6 @@ class Binance(AccountModel):
         account = self.client.get_account()
         balances = pd.DataFrame(account['balances'])
         return balances
-
-    def get_order_book(self, instrument:str) -> DataFrame:
-        """
-            Get order book of a instrument
-        """
-        order_book = self.client.get_order_book(symbol=instrument)
-        return order_book
     
     def get_historical_instrument_price(self, 
                              instrument:str,
@@ -354,3 +347,24 @@ class Binance(AccountModel):
         trades['commission'] = trades['commission'].astype(float)
 
         return trades
+    
+    def get_order_book(self, instrument:str, limit=1000) -> tuple[DataFrame, DataFrame]:
+        '''
+            Get Live Order Books
+        '''
+        orders = self.client.get_order_book(symbol=instrument, limit=limit)
+
+        df_bids = pd.DataFrame({'price': list(zip(*orders['bids']))[0], 'quantity': list(zip(*orders['bids']))[1]})
+        df_asks = pd.DataFrame({'price': list(zip(*orders['asks']))[0], 'quantity': list(zip(*orders['bids']))[1]})
+
+        df_bids['price'] = df_bids['price'].astype('float')
+        df_bids['quantity'] = df_bids['quantity'].astype('float')
+        df_bids = df_bids.sort_values('price', ascending=False)
+        df_bids['quantity_cum'] = df_bids['quantity'].cumsum()
+
+        df_asks['price'] = df_asks['price'].astype('float')
+        df_asks['quantity'] = df_asks['quantity'].astype('float')
+        df_asks = df_asks.sort_values('price')
+        df_asks['quantity_cum'] = df_asks['quantity'].cumsum()
+
+        return df_bids, df_asks
