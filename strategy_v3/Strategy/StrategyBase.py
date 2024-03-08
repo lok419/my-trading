@@ -265,34 +265,46 @@ class StrategyBase(StrategyModel):
         '''
             Actual function to execute the strategy repeatedly
         '''
-        while True:    
-            try:                
-                self.update_strategy_params()
-                self.load_data(lookback)                
+        try:
+            while True:    
+                try:                
+                    self.update_strategy_params()
+                    self.load_data(lookback)                
 
-                df = self.df
-                data = self.df.iloc[-1]                
-                self.sanity_check_data(df, data)
+                    df = self.df
+                    data = self.df.iloc[-1]                
+                    self.sanity_check_data(df, data)
 
-                self.execute(data)    
-                sleep(tick_sec)
+                    self.execute(data)    
+                    sleep(tick_sec)
 
-            except Timeout as e:
-                traceback.print_exception(e)
-                self.logger.error(e)        
-                self.logger.error('handled explicitly. retring....')
-
-            except BinanceAPIException as e:
-                traceback.print_exception(e)
-                self.logger.error(e)                
-                if e.code == -1021:
+                except Timeout as e:
+                    traceback.print_exception(e)
+                    self.logger.error(e)        
                     self.logger.error('handled explicitly. retring....')
-                    sleep(30)
 
-                else:
-                    raise(e)    
-                                
-            except CustomException as e:
-                traceback.print_exception(e)
-                self.logger.error(e)    
-                self.logger.error('retrying.....')
+                except BinanceAPIException as e:
+                    traceback.print_exception(e)
+                    self.logger.error(e)                
+                    if e.code == -1021:
+                        self.logger.error('handled explicitly. retring....')
+                        sleep(30)
+                    else:
+                        raise(e)    
+                                    
+                except CustomException as e:
+                    traceback.print_exception(e)
+                    self.logger.error(e)    
+                    self.logger.error('retrying.....')
+
+        except KeyboardInterrupt as e:    
+            traceback.print_exception(e)      
+            self.logger.error(e)                
+            self.cancel_all_orders()
+            self.close_out_positions()
+
+        except Exception as e:   
+            traceback.print_exception(e)             
+            self.logger.error(e)                
+            self.cancel_all_orders()
+            self.close_out_positions()

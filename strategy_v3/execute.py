@@ -18,33 +18,6 @@ warnings.filterwarnings('ignore')
 
 # /usr/local/bin/python3 /Users/lok419/Desktop/JupyterLab/Trading/strategy_v3/execute.py SOLv1
 
-def sanity_check_data(df: DataFrame, data: dict):
-    '''
-        Sanity check the input data and make sure data are latest
-    '''
-    dt_now = pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
-    interval = df['Date'].diff().iloc[-1].seconds
-    since_last = (dt_now - data['Date']).seconds
-
-    if since_last >= interval:
-        raise CustomException(f'data last updated time is more than {interval}')
-
-def update_strategy_params(strategy: StrategyModel, strategy_setup: ExecuteSetup):
-    '''
-        This allow user to update the strategy parameters on the fly by changing the execute_setup.json        
-    '''
-    strategy_params = strategy_setup.read()
-    for key, value in strategy_params.items():
-        value_org = getattr(strategy, key)    
-
-        # Exceptional case on status as this is an ENUM but we stored as string, we need cast it to string before comparison
-        value_org = value_org.name if key == 'status' else value_org
-        value_org = value_org.strftime('%Y-%m-%d %H:%M:%S') if type(value_org) == datetime else value_org
-        
-        if value != value_org:
-            strategy.logger.info(f'update {key} from {value_org} to {value}')
-            setattr(strategy, key, value)
-
 if __name__ == '__main__':    
 
     strategy_id = sys.argv[1]    
@@ -55,18 +28,4 @@ if __name__ == '__main__':
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
     strategy.set_strategy_id(strategy_id)    
-
-    try:
-        strategy.run()        
-
-    except KeyboardInterrupt as e:    
-        traceback.print_exception(e)      
-        strategy.logger.error(e)                
-        strategy.cancel_all_orders()
-        strategy.close_out_positions()
-
-    except Exception as e:   
-        traceback.print_exception(e)             
-        strategy.logger.error(e)                
-        strategy.cancel_all_orders()
-        strategy.close_out_positions()
+    strategy.run()        
