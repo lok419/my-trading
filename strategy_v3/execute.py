@@ -55,40 +55,9 @@ if __name__ == '__main__':
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
     strategy.set_strategy_id(strategy_id)    
-    
+
     try:
-        while True:    
-            try:                
-                update_strategy_params(strategy, strategy_setup)
-                                
-                # 360 data points
-                strategy.load_data('1 Days Ago')                                
-                df = strategy.df
-                data = df.iloc[-1]                
-                sanity_check_data(df, data)            
-                strategy.execute(data)    
-
-                sleep(60)
-
-            except Timeout as e:
-                traceback.print_exception(e)
-                strategy.logger.error(e)        
-                strategy.logger.error('handled explicitly. retring....')
-
-            except BinanceAPIException as e:
-                traceback.print_exception(e)
-                strategy.logger.error(e)                
-                if e.code == -1021:
-                    strategy.logger.error('handled explicitly. retring....')
-                    sleep(30)
-
-                else:
-                    raise(e)    
-                                
-            except CustomException as e:
-                traceback.print_exception(e)
-                strategy.logger.error(e)    
-                strategy.logger.error('retrying.....')                      
+        strategy.run()        
 
     except KeyboardInterrupt as e:    
         traceback.print_exception(e)      

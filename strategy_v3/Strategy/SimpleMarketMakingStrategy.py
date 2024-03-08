@@ -67,6 +67,9 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 self.mm_id = mm_id
 
     def execute(self, data):
+        '''
+            Execute function which is called repeatedly for each tick
+        '''
         date = data['Date']
         vol = data['close_std']
 
@@ -79,6 +82,12 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         self.cancel_all_orders(limit=50, silence=True)
         self.logger.info('inv: {}, mid: {}, r: {}, spread: {}. creating new bid ask orders.....'.format(round(current_position, self.qty_decimal), round(mid_px, self.price_decimal), round(r, self.price_decimal), round(spread, self.price_decimal)))        
         self.place_bid_ask_order([bid], [ask], mid_px, date)
+
+    def run(self):
+        '''
+            Actual function to execute the strategy repeatedly
+        '''
+        super().run(lookback='2 hours ago', tick_sec=30)
 
     def place_bid_ask_order(self, 
                             bids: list[float], 

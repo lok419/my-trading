@@ -1,3 +1,6 @@
+from time import sleep
+import traceback
+from strategy_v3 import ExecuteSetup
 from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
 from strategy_v3.Strategy import STATUS, StrategyModel
@@ -7,6 +10,9 @@ from pandas.core.frame import DataFrame
 from zoneinfo import ZoneInfo
 import pandas as pd
 import random
+from requests.exceptions import Timeout
+from binance.exceptions import BinanceAPIException
+from strategy_v3.Misc import CustomException
 
 
 class StrategyBase(StrategyModel):    
@@ -134,6 +140,9 @@ class StrategyBase(StrategyModel):
     def execute(self, data):
         pass    
 
+    def run(self):
+        pass
+
     def close_out_positions(self,                                                         
                             type:str = 'close',
                             price: float = None,
@@ -224,4 +233,66 @@ class StrategyBase(StrategyModel):
         df_orders = self.get_all_orders(limit = limit)
         df_orders = df_orders[df_orders['status'] != 'FILLED']                
         df_orders = df_orders[df_orders['status'] != 'CANCELED']
-        self.executor.cancel_order(self.instrument, df_orders)                
+        self.executor.cancel_order(self.instrument, df_orders)    
+
+    def update_strategy_params(self):
+        strategy_setup = ExecuteSetup(self.strategy_id)
+
+        strategy_params = strategy_setup.read()
+        for key, value in strategy_params.items():
+            value_org = getattr(self, key)    
+
+        # Exceptional case on status as this is an ENUM but we stored as string, we need cast it to string before comparison
+        value_org = value_org.name if key == 'status' else value_org
+        value_org = value_org.strftime('%Y-%m-%d %H:%M:%S') if type(value_org) == datetime else value_org
+        
+        if value != value_org:
+            self.logger.info(f'update {key} from {value_org} to {value}')
+            setattr(self, key, value)
+
+    def sanity_check_data(self, df: DataFrame, data: dict):
+        '''
+            Sanity check the input data and make sure data are latest
+        '''
+        dt_now = self.get_current_time()
+        interval = df['Date'].diff().iloc[-1].seconds
+        since_last = (dt_now - data['Date']).seconds
+
+        if since_last >= interval:
+            raise CustomException(f'data last updated time is more than {interval}')
+
+    def run(self, lookback:str, tick_sec:int):
+        '''
+            Actual function to execute the strategy repeatedly
+        '''
+        while True:    
+            try:                
+                self.update_strategy_params()
+                self.load_data(lookback)                
+
+                df = self.df
+                data = self.df.iloc[-1]                
+                self.sanity_check_data(df, data)
+
+                self.execute(data)    
+                sleep(tick_sec)
+
+            except Timeout as e:
+                traceback.print_exception(e)
+                self.logger.error(e)        
+                self.logger.error('handled explicitly. retring....')
+
+            except BinanceAPIException as e:
+                traceback.print_exception(e)
+                self.logger.error(e)                
+                if e.code == -1021:
+                    self.logger.error('handled explicitly. retring....')
+                    sleep(30)
+
+                else:
+                    raise(e)    
+                                
+            except CustomException as e:
+                traceback.print_exception(e)
+                self.logger.error(e)    
+                self.logger.error('retrying.....')

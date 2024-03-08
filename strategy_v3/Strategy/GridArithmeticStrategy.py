@@ -145,7 +145,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
         self.df = df    
 
-    def execute(self, data):
+    def execute(self, data=None):
         '''
             This function is used to execute for ONE TIME INTERVAL
             For real trading, for each refreshed time interval, we call this function once only.
@@ -156,7 +156,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 - high and low price to see if fill orders and triggers stop loss
 
             data: structure contains all required data for strategy
-        '''
+        '''                
         date = data['Date']
         hurst_exponent = data['hurst_exponent']
         open, close, high, low = data['Open'], data['Close'], data['High'], data['Low']            
@@ -512,4 +512,10 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 return ''              
         df_orders['grid_type'] = df_orders['clientOrderId'].apply(grid_type_find)          
 
-        return df_orders    
+        return df_orders
+    
+    def run(self):
+        '''
+            Actual function to exectue the strategy repeatedly
+        '''
+        super().run(lookback='12 Hours Ago', tick_sec=60)        
