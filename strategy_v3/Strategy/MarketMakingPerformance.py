@@ -71,9 +71,7 @@ class MarketMakingPerformance(StrategyPerformance):
         fig.add_trace(go.Candlestick(x=df["Date"], open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name="OHLC", legendgroup='OHCL'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df["Date"], y=df['close_sma'], name=sma_name, legendgroup=sma_name, marker=dict(color=colors[0])), row=1, col=1)
         fig.update(layout_xaxis_rangeslider_visible=False)
-        
-                    
-        # grid orders 
+                                
         filled_grid_orders = df_orders[(df_orders['status'] == 'FILLED')]
         filled_grid_buy = filled_grid_orders[filled_grid_orders['side'] == 'BUY']
         filled_grid_sell = filled_grid_orders[filled_grid_orders['side'] == 'SELL']

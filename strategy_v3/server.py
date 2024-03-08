@@ -2,16 +2,18 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from utils.credentials import TELEGRAM_BOT_API_KEY, NGROK_DOMAIN, NGROK_PORT_TUNNEL, NGROK_DOMAIN_URL
-from strategy_v3.ExecuteSetup import ExecuteSetup
+from strategy_v3.ExecuteSetup import ExecuteSetup, StrategyFactory
 from strategy_v3.DataLoader import DataLoaderBinance
 from strategy_v3.Executor import ExecutorBinance
-from strategy_v3.Strategy import GridArithmeticStrategy
 from tabulate import tabulate
 from utils.logging import get_logger
 import json
 import warnings
 import tempfile
 import subprocess
+import traceback
+import inspect
+import numpy as np
 
 warnings.filterwarnings('ignore')
 logger = get_logger('Telegram Bot')
@@ -21,9 +23,9 @@ default_update_options = {
     'vol_lookback': [10, 15, 20, 30, 40, 60],
     'vol_grid_scale': [0.05, 0.1, 0.15, 0.2, 0.25, 0.3 ,0.4],
     'vol_stoploss_scale': [1,2,3,4,5],
-    'position_size': [50, 100, 300, 500, 1000],
+    'position_size': [10, 50, 100, 300, 500, 1000],
     'hurst_exp_mr_threshold': [0, 0.4, 0.5, 0.6],
-    'hurst_exp_mo_threshold': [0.6, 0.7, 0.8, 1],
+    'hurst_exp_mo_threshold': [0.6, 0.7, 0.8, 1],        
 }
 
 def handler_print(func):
@@ -49,6 +51,7 @@ def handler_expcetion(func):
         try:
             await func(update=update, context=context)
         except Exception as e:
+            traceback.print_exception(e)
             logger.error(e)
             msg = f'failed - {e}'
             await context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
@@ -113,12 +116,18 @@ async def update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     value = context.args[2] if len(context.args) > 2  else None 
 
     # display which params to update
-    if key is None and value is None:    
+    if key is None and value is None:   
+
+        strategy = StrategyFactory().get(s)
+        default_args = list(inspect.signature(type(strategy).__init__).parameters.keys())        
+
         button_list = []        
         button_list.append([InlineKeyboardButton(text='Back', callback_data=f'/action {s}')])
         button_list.append([InlineKeyboardButton(text='Config', callback_data=f'/config {s}')])
+        
         for p in default_update_options:
-            button_list.append([InlineKeyboardButton(text=p, callback_data=f'/update {s} {p}')])    
+            if p in default_args:
+                button_list.append([InlineKeyboardButton(text=p, callback_data=f'/update {s} {p}')])    
 
         markup = InlineKeyboardMarkup(button_list)    
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f'Strategy {s} params:', reply_markup=markup)
@@ -143,8 +152,9 @@ async def update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # update a key and value
     elif key is not None and value is not None:
-        setup = ExecuteSetup(s)
-        setup.update(key, value)
+        strategy = StrategyFactory().get(s)        
+        setup = ExecuteSetup(s)        
+        setup.update(key, value, type(strategy))
         config = setup.read()
         config = str(json.dumps(config, indent=4))        
         msg = 'succeeded\n'
@@ -173,10 +183,9 @@ async def pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
         Table summary of strategy pnl performance 
     '''        
     strategy_id = context.args[0]
-    time = " ".join(context.args[1:])
-    params = ExecuteSetup(strategy_id).read()
+    time = " ".join(context.args[1:])    
 
-    strategy = GridArithmeticStrategy(**params)
+    strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
     strategy.set_strategy_id(strategy_id)
@@ -193,10 +202,9 @@ async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         Plot summary of strategy performance
     '''    
     strategy_id = context.args[0]
-    time = " ".join(context.args[1:])
-    params = ExecuteSetup(strategy_id).read()
+    time = " ".join(context.args[1:])    
 
-    strategy = GridArithmeticStrategy(**params)
+    strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
     strategy.set_strategy_id(strategy_id)
@@ -214,16 +222,15 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''    
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])
-    params = ExecuteSetup(strategy_id).read()
-
-    strategy = GridArithmeticStrategy(**params)
+    
+    strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
     strategy.set_strategy_id(strategy_id)
     strategy.load_data(time)
 
     with tempfile.NamedTemporaryFile(delete=True, suffix='.png') as file:        
-        strategy.summary(plot_orders=True, lastn=20, save_jpg_path=file.name, show_pnl_metrics=False)
+        strategy.summary(plot_orders=True, save_jpg_path=file.name, show_pnl_metrics=False)
         table = strategy.df_pnl_metrics
         table = tabulate(table, headers='keys', tablefmt='psql', showindex=False)    
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f'<pre>{table}</pre>', parse_mode=ParseMode.HTML)

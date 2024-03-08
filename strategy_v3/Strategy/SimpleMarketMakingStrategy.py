@@ -4,14 +4,14 @@ from strategy_v3.Strategy import STATUS, StrategyBase, MarketMakingPerformance
 import numpy as np
 import re
 
-class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
+class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):    
 
     def __init__(self, 
                  instrument: str, 
                  interval: str,   
-                 vol_lookback = 20,    
-                 gamma = 0.4,                
-                 spread = 20,       
+                 vol_lookback: int = 20,    
+                 gamma: float = 0.4,                
+                 spread: float = 20,       
                  target_position: float = 0,                
                  position_size: float = 50,
                  price_decimal: int = 2,

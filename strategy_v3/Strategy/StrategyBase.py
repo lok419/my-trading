@@ -240,15 +240,15 @@ class StrategyBase(StrategyModel):
 
         strategy_params = strategy_setup.read()
         for key, value in strategy_params.items():
-            value_org = getattr(self, key)    
+            value_org = getattr(self, key)                
 
-        # Exceptional case on status as this is an ENUM but we stored as string, we need cast it to string before comparison
-        value_org = value_org.name if key == 'status' else value_org
-        value_org = value_org.strftime('%Y-%m-%d %H:%M:%S') if type(value_org) == datetime else value_org
-        
-        if value != value_org:
-            self.logger.info(f'update {key} from {value_org} to {value}')
-            setattr(self, key, value)
+            # Exceptional case on status as this is an ENUM but we stored as string, we need cast it to string before comparison
+            value_org = value_org.name if key == 'status' else value_org
+            value_org = value_org.strftime('%Y-%m-%d %H:%M:%S') if type(value_org) == datetime else value_org
+            
+            if value != value_org:
+                self.logger.info(f'update {key} from {value_org} to {value}')
+                setattr(self, key, value)
 
     def sanity_check_data(self, df: DataFrame, data: dict):
         '''
