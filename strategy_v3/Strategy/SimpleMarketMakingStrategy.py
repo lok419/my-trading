@@ -1,10 +1,10 @@
 from datetime import datetime
 from pandas.core.frame import DataFrame
-from strategy_v3.Strategy import STATUS, StrategyBase
+from strategy_v3.Strategy import STATUS, StrategyBase, MarketMakingPerformance
 import numpy as np
 import re
 
-class SimpleMarketMakingStrategy(StrategyBase):
+class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
 
     def __init__(self, 
                  instrument: str, 
@@ -145,11 +145,11 @@ class SimpleMarketMakingStrategy(StrategyBase):
         ask = r + spread/2
         return r, spread, bid, ask
 
-    def load_data(self, lookback) -> DataFrame:        
+    def load_data(self, lookback:str|datetime, lookback_end:str|datetime=None) -> DataFrame:        
         '''
             Load all hisotorical price data
         '''
-        df = super().load_data(lookback) 
+        df = super().load_data(lookback, lookback_end) 
         df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
         self.df = df

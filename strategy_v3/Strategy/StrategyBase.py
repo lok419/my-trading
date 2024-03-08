@@ -116,11 +116,11 @@ class StrategyBase(StrategyModel):
     def get_current_time(self) -> datetime:
         return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
 
-    def load_data(self, lookback) -> DataFrame:
+    def load_data(self, lookback:str|datetime, lookback_end:str|datetime=None) -> DataFrame:
         if lookback is None or lookback == '':
             lookback = self.start_date.strftime('%Y-%m-%d %H:%M:%S')
 
-        df = self.data_loader.load_price_data(self.instrument, self.interval, lookback)
+        df = self.data_loader.load_price_data(self.instrument, self.interval, lookback, lookback_end=lookback_end)
         self.df = df
         return self.df
 

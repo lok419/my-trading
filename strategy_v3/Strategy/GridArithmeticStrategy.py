@@ -1,4 +1,4 @@
-from strategy_v3.Strategy import StrategyPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATUS, StrategyBase
+from strategy_v3.Strategy import GridPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATUS, StrategyBase
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
@@ -8,7 +8,7 @@ import numpy as np
 import math
 import re
 
-class GridArithmeticStrategy(StrategyBase, StrategyPerformance):
+class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
     def __init__(self, 
                  instrument:str, 
