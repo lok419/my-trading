@@ -1,5 +1,6 @@
 {
     "v1": {
+        "class": "GridArithmeticStrategy",
         "instrument": "BTCFDUSD",
         "interval": "5m",
         "grid_size": 5,
@@ -15,6 +16,7 @@
         "start_date": "2024-02-25 00:00:00"
     },
     "SOLv1": {
+        "class": "GridArithmeticStrategy",
         "instrument": "SOLFDUSD",
         "interval": "5m",
         "grid_size": 5,
@@ -26,9 +28,11 @@
         "hurst_exp_mo_threshold": 0.7,
         "price_decimal": 2,
         "qty_decimal": 2,
-        "status": "RUN"
+        "status": "RUN",
+        "start_date": "2024-03-01 00:00:00"     
     },
     "ETHv1": {
+        "class": "GridArithmeticStrategy",
         "instrument": "ETHFDUSD",
         "interval": "5m",
         "grid_size": 5,
@@ -40,6 +44,21 @@
         "hurst_exp_mo_threshold": 0.7,
         "price_decimal": 2,
         "qty_decimal": 4,
-        "status": "RUN"
+        "status": "RUN",
+        "start_date": "2024-03-03 18:00:00"
+    },
+    "SMM_BTCv1": {
+        "class": "SimpleMarketMakingStrategy",
+        "instrument": "BTCFDUSD",
+        "interval": "1m",
+        "vol_lookback": 20,    
+        "gamma": 0.4,                
+        "spread": 20,       
+        "target_position": 0,                
+        "position_size": 10,
+        "price_decimal": 2,
+        "qty_decimal": 5,                             
+        "status": "RUN",               
+        "start_date": "2024-03-06 12:00:00"
     }
 }

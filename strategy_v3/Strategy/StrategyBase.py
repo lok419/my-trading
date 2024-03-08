@@ -1,6 +1,5 @@
 from time import sleep
-import traceback
-from strategy_v3 import ExecuteSetup
+from strategy_v3.ExecuteSetup import ExecuteSetup
 from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
 from strategy_v3.Strategy import STATUS, StrategyModel
@@ -8,11 +7,12 @@ from datetime import datetime
 from utils.logging import get_logger
 from pandas.core.frame import DataFrame
 from zoneinfo import ZoneInfo
-import pandas as pd
-import random
 from requests.exceptions import Timeout
 from binance.exceptions import BinanceAPIException
 from strategy_v3.Misc import CustomException
+import pandas as pd
+import random
+import traceback
 
 
 class StrategyBase(StrategyModel):    
@@ -235,7 +235,7 @@ class StrategyBase(StrategyModel):
         df_orders = df_orders[df_orders['status'] != 'CANCELED']
         self.executor.cancel_order(self.instrument, df_orders)    
 
-    def update_strategy_params(self):
+    def update_strategy_params(self):                  
         strategy_setup = ExecuteSetup(self.strategy_id)
 
         strategy_params = strategy_setup.read()

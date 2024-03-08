@@ -61,7 +61,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         super().set_strategy_id(id)
 
         if reload and not self.is_backtest() and self.mm_id == 0:
-            df_orders = self.get_all_orders(limit=10)
+            df_orders = self.get_all_orders()
             if len(df_orders) > 0:                
                 mm_id = df_orders.iloc[-1]['mm_id']                                
                 self.mm_id = mm_id
