@@ -126,7 +126,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         '''
             Actual function to execute the strategy repeatedly
         '''        
-        super().run(lookback='2 hours ago', refresh_interval=self.refresh_interval)
+        super().run(lookback='2 hours ago')
 
     def derive_bid_ask_order(self, current, df_bids, df_asks, adv, vol):
         '''

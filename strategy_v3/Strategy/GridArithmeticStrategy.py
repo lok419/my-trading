@@ -521,4 +521,4 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             Actual function to exectue the strategy repeatedly
         '''
-        super().run(lookback='12 Hours Ago', refresh_interval=self.refresh_interval)        
+        super().run(lookback='12 Hours Ago')        

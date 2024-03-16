@@ -265,7 +265,7 @@ class StrategyBase(StrategyModel):
         if since_last >= interval:
             raise CustomException(f'data last updated time is more than {interval}')
 
-    def run(self, lookback:str, refresh_interval:int):
+    def run(self, lookback:str):
         '''
             Actual function to execute the strategy repeatedly
         '''
@@ -280,7 +280,7 @@ class StrategyBase(StrategyModel):
                     self.sanity_check_data(df, data)
 
                     self.execute(data)    
-                    sleep(refresh_interval)
+                    sleep(self.refresh_interval)
 
                 except Timeout as e:
                     traceback.print_exception(e)
