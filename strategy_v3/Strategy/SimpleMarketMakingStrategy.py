@@ -12,10 +12,10 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
     def __init__(self, 
                  instrument: str, 
                  interval: str,   
+                 refresh_interval: int = 60,
                  vol_lookback: int = 20,    
-                 gamma: float = 0.4,                
-                 spread: float = 20,       
-                 vol_spread_scale: float = 0.3,
+                 gamma: float = 0.4,                 
+                 spread_adv_factor: float = 0.01,
                  target_position: float = 0,                
                  position_size: float = 50,
                  hurst_exp_mr_threshold: float = 0.5,                 
@@ -29,6 +29,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         '''
             instrument:             The instrument to trade
             interval:               time interval to trade            
+            refresh_interval:       frequency of function execute() is called (in mintues)
             gamma:                  inventory risk aversion factor
             target_position:        target position to keep during market making (e.g. if i have directional views, i want to have target position)
             position_size:          position size of each limit order
@@ -42,7 +43,8 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         '''
         super().__init__(
             instrument=instrument,
-            interval=interval,            
+            interval=interval,   
+            refresh_interval=refresh_interval,         
             price_decimal=price_decimal,
             qty_decimal=qty_decimal,
             status=status,   
@@ -51,9 +53,8 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         )    
 
         self.vol_lookback = vol_lookback
-        self.gamma = gamma
-        self.spread = spread        
-        self.vol_spread_scale = vol_spread_scale
+        self.gamma = gamma              
+        self.spread_adv_factor = spread_adv_factor
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
         self.target_position = target_position
@@ -92,6 +93,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         '''
         date = data['Date']
         vol = data['atr']      
+        adv = data['adv']
         hurst_exponent = data['hurst_exponent']
 
         current_position = self.get_current_position()
@@ -105,21 +107,54 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 self.close_out_positions()        
             return
         
-        df_bids, df_asks = self.get_order_book()
-        mid_px = (df_asks.iloc[0]['price'] + df_bids.iloc[0]['price']) / 2
-        r, spread, bid, ask = self.derive_bid_ask_order(mid_px, current_position, self.target_position, vol, self.gamma, self.spread, self.vol_spread_scale)
+        df_bids, df_asks = self.get_order_book()    
+        r, spread, order_bid, order_ask, mid_px = self.derive_bid_ask_order(current_position, df_bids, df_asks, adv, vol)        
 
         self.cancel_all_orders(limit=50, silence=True)
-        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, r: {}, spread: {}. creating new bid ask orders.....'.format(
-            self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal), round(mid_px, self.price_decimal), round(r, self.price_decimal), round(spread, self.price_decimal)))        
-        
-        self.place_bid_ask_order([bid], [ask], mid_px, date)
+        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
+            self.status.name, ts_prop.name, hurst_exponent, 
+            round(current_position, self.qty_decimal), 
+            round(mid_px, self.price_decimal), 
+            round(r, self.price_decimal), 
+            round(spread, self.price_decimal),
+            round(vol, self.price_decimal), 
+            round(adv, self.qty_decimal)
+        ))             
+        self.place_bid_ask_order([order_bid], [order_ask], mid_px, date)
 
     def run(self):
         '''
             Actual function to execute the strategy repeatedly
+        '''        
+        super().run(lookback='2 hours ago', refresh_interval=self.refresh_interval)
+
+    def derive_bid_ask_order(self, current, df_bids, df_asks, adv, vol):
         '''
-        super().run(lookback='2 hours ago', tick_sec=60)
+            Derive the bid ask price of the maker LIMIT order based on Stoikov Maket Making Model
+
+            1. Reservation Price which determines the mid price of the bid-ask order, it is determined by
+                - distance between current position and target position
+                - inventory risk (volatility / inventory risk aversion factor)
+                - time until market close (NOT APPLICABLE FOR CRYPTO)  
+
+            2. Spread - spread is aimed to capture x% of the ADV
+                - flow target = x% * ADV
+                - spread_bid = volume between best bid to this bid such that volume = flow target / 2                
+                - spread_ask = volume between best ask to this ask such that volume = flow target / 2                
+                - target_spread = spread_ask - spread_bid
+                - Basically this is the spreads expected to capture x% of ADV                
+        '''
+        flow_target = adv * self.spread_adv_factor
+        spread_ask = df_asks[df_asks['quantity_cum'] > flow_target/2]['price'].min()
+        spread_bid = df_bids[df_bids['quantity_cum'] > flow_target/2]['price'].max()        
+        spread = spread_ask - spread_bid  
+        mid_px = (df_asks.iloc[0]['price'] + df_bids.iloc[0]['price']) / 2
+
+        r = mid_px - (current - self.target_position) * self.gamma * vol ** 2
+        order_bid = r - spread/2
+        order_ask = r + spread/2
+
+        return r, spread, order_bid, order_ask, mid_px
 
     def place_bid_ask_order(self, 
                             bids: list[float], 
@@ -170,23 +205,6 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             ) 
             i += 1               
 
-    def derive_bid_ask_order(self, mid_px, current, target, vol, gamma, spread, vol_spread_scale):
-        '''
-            Derive the bid ask price of the maker LIMIT order based on Stoikov Maket Making Model
-
-            1. Reservation Price which determines the mid price of the bid-ask order, it is determined by
-                - distance between current position and target position
-                - inventory risk (volatility / inventory risk aversion factor)
-                - time until market close (NOT APPLICABLE FOR CRYPTO)  
-
-            2. Spread - fixed spread
-        '''   
-        spread = vol_spread_scale * vol
-        r = mid_px - (current - target) * gamma * vol ** 2
-        bid = r - spread/2
-        ask = r + spread/2
-        return r, spread, bid, ask
-
     def load_data(self, lookback:str|datetime, lookback_end:str|datetime=None) -> DataFrame:        
         '''
             Load all hisotorical price data
@@ -194,9 +212,10 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         df = super().load_data(lookback, lookback_end) 
         df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
+        df['adv'] = df['Volume'].rolling(self.vol_lookback).mean().shift(1)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
-        # Average True Range
 
+        # Average True Range
         df['tr'] = np.maximum(df['High'] - df['Low'], np.abs(df['High'] - df['Close'].shift(1)), np.abs(df['Low'] - df['Close'].shift(1)))
         df['atr'] = df['tr'].rolling(self.vol_lookback).mean().shift(1)
         self.df = df

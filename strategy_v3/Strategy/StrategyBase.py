@@ -19,7 +19,8 @@ class StrategyBase(StrategyModel):
 
     def __init__(self, 
                  instrument:str, 
-                 interval:str,                                  
+                 interval:str,        
+                 refresh_interval:int = 60,            
                  price_decimal: int = 2,
                  qty_decimal: int = 5,     
                  status: str = STATUS.RUN,
@@ -29,6 +30,7 @@ class StrategyBase(StrategyModel):
         '''
             instrument:             The instrument to trade
             interval:               time interval to trade            
+            refresh_interval:       frequency of function execute() is called (in mintues)
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
@@ -36,7 +38,8 @@ class StrategyBase(StrategyModel):
             verbose:                True to print the log message
         '''
         self.instrument = instrument
-        self.interval = interval              
+        self.interval = interval       
+        self.refresh_interval = refresh_interval       
         self.qty_decimal = qty_decimal
         self.price_decimal = price_decimal   
         self.start_date = start_date     
@@ -262,7 +265,7 @@ class StrategyBase(StrategyModel):
         if since_last >= interval:
             raise CustomException(f'data last updated time is more than {interval}')
 
-    def run(self, lookback:str, tick_sec:int):
+    def run(self, lookback:str, refresh_interval:int):
         '''
             Actual function to execute the strategy repeatedly
         '''
@@ -277,7 +280,7 @@ class StrategyBase(StrategyModel):
                     self.sanity_check_data(df, data)
 
                     self.execute(data)    
-                    sleep(tick_sec)
+                    sleep(refresh_interval)
 
                 except Timeout as e:
                     traceback.print_exception(e)

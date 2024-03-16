@@ -13,6 +13,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     def __init__(self, 
                  instrument:str, 
                  interval:str,
+                 refresh_interval:int = 60,
                  grid_size:int = 5,
                  vol_lookback:float = 30,
                  vol_grid_scale: float = 1,
@@ -29,6 +30,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             instrument:             The instrument to trade
             interval:               time interval to trade
+            refresh_interval:       frequency of function execute() is called (in mintues)
             grid_size:              Size of the Grid, this refers to one directional, i.e. if grids size = 5, that means 5 buy ordes + 5 sell orders
             vol_lookback:           Lookback period to determine the historical volatility
             vol_grid_size:          Grid spacing in terms of historical volatility
@@ -44,6 +46,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         super().__init__(
             instrument=instrument,
             interval=interval,
+            refresh_interval=refresh_interval,
             price_decimal=price_decimal,
             qty_decimal=qty_decimal,
             status=status,
@@ -518,4 +521,4 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             Actual function to exectue the strategy repeatedly
         '''
-        super().run(lookback='12 Hours Ago', tick_sec=60)        
+        super().run(lookback='12 Hours Ago', refresh_interval=self.refresh_interval)        
