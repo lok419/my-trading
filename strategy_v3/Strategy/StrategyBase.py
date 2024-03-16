@@ -160,7 +160,7 @@ class StrategyBase(StrategyModel):
         all_orders = self.get_all_orders(query_all=True)    
         filled = all_orders[all_orders['status'] == 'FILLED']
         filled_net_qty = filled['NetExecutedQty'].sum()   
-        filled_net_qty = round(filled_net_qty, self.qty_decimal)
+        filled_net_qty = round(filled_net_qty, self.qty_decimal)        
 
         if abs(filled_net_qty) > 0:
             self.logger.info('closing out net position of {} {}....'.format(filled_net_qty, self.instrument))
@@ -172,7 +172,8 @@ class StrategyBase(StrategyModel):
                 order_id = f'{self.__str__()}_{type}'
 
             side = 'BUY' if filled_net_qty < 0 else 'SELL'
-            quantity = abs(filled_net_qty)
+            quantity = abs(filled_net_qty)                          
+
             self.executor.place_order(
                 instrument=self.instrument,
                 side=side,

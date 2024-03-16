@@ -226,7 +226,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             self.cancel_all_orders()                        
             self.close_out_positions('close', None, None, force=True)
             self.status = STATUS.STOP
-            ExecuteSetup(self.strategy_id).update("status", STATUS.STOP.name)
+            ExecuteSetup(self.strategy_id).update("status", STATUS.STOP.name, type(self))
 
     def get_grid_status(self) -> GRID_STATUS:
         if self.is_idle():

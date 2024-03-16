@@ -96,7 +96,7 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton(text='Stop', callback_data=f'/update {s} status STOP'),        
     ])
 
-    times = ['2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago']
+    times = ['2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago', 'LTD']
     for t in times:
         button_list.append([InlineKeyboardButton(text=t, callback_data='/')])
         button_list.append([
@@ -184,6 +184,7 @@ async def pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''        
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])    
+    time = "" if time == 'LTD' else time
 
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
@@ -203,6 +204,7 @@ async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''    
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])    
+    time = "" if time == 'LTD' else time
 
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
@@ -222,6 +224,7 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''    
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])
+    time = "" if time == 'LTD' else time
     
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
