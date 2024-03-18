@@ -20,6 +20,19 @@ class MarketMakingPerformance(StrategyPerformance):
         df_pnl = super().compute_pnl(orders, capital)
         return df_pnl
 
+    def compute_position(self, orders: DataFrame) -> DataFrame:
+        orders = orders
+        orders = orders.sort_values('updateTime')
+        orders['position'] = orders['NetExecutedQty'].cumsum()
+        orders['Date'] = orders['updateTime'].dt.round(self.interval_round)        
+
+        df_pos = orders[['Date', 'position']].groupby(['Date']).last().reset_index()
+        df_pos = pd.merge(df_pos, self.df[['Date', 'Close']], how='left', on='Date', validate='1:1')        
+        df_pos['position_fiat'] = df_pos['position'] * df_pos['Close']
+        df_pos['position_per_size'] = df_pos['position_fiat'] / self.position_size
+
+        return df_pos
+
     def summary(self, 
                 plot_orders:bool=False,                 
                 show_pnl_metrics: bool = True,
@@ -40,6 +53,7 @@ class MarketMakingPerformance(StrategyPerformance):
 
         df_pnl = self.compute_pnl(df_orders)                
         df_pnl_metrics = self.compute_pnl_metrics(df_pnl, df_orders)
+        df_pos = self.compute_position(df_orders)
             
         # just save the data to object property
         self.df_orders = df_orders
@@ -50,20 +64,21 @@ class MarketMakingPerformance(StrategyPerformance):
             display(df_pnl_metrics)
 
         fig = make_subplots(
-            rows=4, cols=1, 
+            rows=5, cols=1, 
             shared_xaxes=True, 
             vertical_spacing=0.05,             
             subplot_titles=[
-                'Price OHLC',     
+                'Price OHLC',                                     
                 'Cumulated PnL / Return (%)', 
+                'Position',
                 f'Average True Range / Close Std ({self.vol_lookback} x {self.interval})',
-                f'Hurst Exponent',                
+                f'Hurst Exponent',                                
             ],         
-            row_heights=[0.8, 0.2, 0.2, 0.2],  
+            row_heights=[0.8, 0.2, 0.2, 0.2, 0.2],  
         )
         fig.update_layout(
             title=self.instrument,
-            width=1500, height=1200,        
+            width=1500, height=1500,        
             hovermode='x',
         )        
 
@@ -90,9 +105,15 @@ class MarketMakingPerformance(StrategyPerformance):
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_gross_cum"], name='Cumulative Gross PnL (Fiat)', visible='legendonly'), row=2, col=1)
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["trading_fee_cum"], name='Cumulative Trading Fee (Fiat)', visible='legendonly'), row=2, col=1)        
 
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['atr'], name='Average True Range'), row=3,col=1)
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['close_std'], name='Close Std'), row=3,col=1)        
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=4,col=1)        
+        # Position
+        fig.add_trace(go.Scatter(x=df_pos['Date'], y=df_pos['position_fiat'], name='Position (Fiat)'),row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pos['Date'], y=df_pos['position'], name='Position', visible='legendonly'),row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pos['Date'], y=df_pos['position_per_size'], name='Position per Size', visible='legendonly'),row=3, col=1)
+
+        # Vol
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['atr'], name='Average True Range'), row=4,col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['close_std'], name='Close Std'), row=4,col=1)        
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=5,col=1)        
 
         if len(save_jpg_path) == 0:
             fig.show()
