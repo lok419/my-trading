@@ -108,13 +108,14 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             return
         
         df_bids, df_asks = self.get_order_book()    
-        r, spread, order_bid, order_ask, mid_px = self.derive_bid_ask_order(current_position, df_bids, df_asks, adv, vol)        
+        r, spread, order_bid, order_ask, mid_px, vwmp = self.derive_bid_ask_order(current_position, df_bids, df_asks, adv, vol)        
 
         self.cancel_all_orders(limit=50, silence=True)
-        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
+        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
             self.status.name, ts_prop.name, hurst_exponent, 
             round(current_position, self.qty_decimal), 
             round(mid_px, self.price_decimal), 
+            round(vwmp, self.price_decimal), 
             round(r, self.price_decimal), 
             round(spread, self.price_decimal),
             round(vol, self.price_decimal), 
@@ -144,17 +145,30 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 - target_spread = spread_ask - spread_bid
                 - Basically this is the spreads expected to capture x% of ADV                
         '''
+        
         flow_target = adv * self.spread_adv_factor
+
         spread_ask = df_asks[df_asks['quantity_cum'] > flow_target/2]['price'].min()
         spread_bid = df_bids[df_bids['quantity_cum'] > flow_target/2]['price'].max()        
-        spread = spread_ask - spread_bid  
+        spread = spread_ask - spread_bid 
+
+        best_bid = df_bids.iloc[0]['price']
+        best_ask = df_asks.iloc[0]['price']
         mid_px = (df_asks.iloc[0]['price'] + df_bids.iloc[0]['price']) / 2
 
-        r = mid_px - (current - self.target_position) * self.gamma * vol ** 2
-        order_bid = r - spread/2
-        order_ask = r + spread/2
+        vw_ask = df_asks[df_asks['quantity_cum'] <= adv/2]
+        vw_ask = (vw_ask['price'] * vw_ask['quantity']).sum() / vw_ask['quantity'].sum()
+        vw_bid = df_bids[df_bids['quantity_cum'] <= adv/2]
+        vw_bid = (vw_bid['price'] * vw_bid['quantity']).sum() / vw_bid['quantity'].sum()
+        vwmp = (vw_ask + vw_bid) / 2
 
-        return r, spread, order_bid, order_ask, mid_px
+        r = vwmp - (current - self.target_position) * self.gamma * vol ** 2
+        order_bid = min(r - spread/2, best_bid)
+        order_ask = max(r + spread/2, best_ask)
+
+        new_spread = order_ask - order_bid
+
+        return r, new_spread, order_bid, order_ask, mid_px, vwmp
 
     def place_bid_ask_order(self, 
                             bids: list[float], 
