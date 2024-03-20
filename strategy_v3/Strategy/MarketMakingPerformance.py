@@ -46,10 +46,13 @@ class MarketMakingPerformance(StrategyPerformance):
             save_jpg_path       file path to save the figure. default to not save
         '''
         df = self.df
-        df_orders = self.get_all_orders(query_all=True, trade_details=True)
+        start_date = df['Date'].min()
+        end_date = df['Date'].max() + timedelta(minutes=self.interval_min)
+
+        df_orders = self.get_all_orders(query_all=True, trade_details=True, start_date=start_date, end_date=end_date)
         df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
-        df_orders = df_orders[df_orders['updateTime'] >= df['Date'].min()]
-        df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max() + timedelta(minutes=self.interval_min)]        
+        df_orders = df_orders[df_orders['updateTime'] >= start_date]
+        df_orders = df_orders[df_orders['updateTime'] <= end_date]        
 
         df_pnl = self.compute_pnl(df_orders)                
         df_pnl_metrics = self.compute_pnl_metrics(df_pnl, df_orders)

@@ -212,7 +212,9 @@ class StrategyBase(StrategyModel):
     def get_all_orders(self, 
                        query_all: bool = False,
                        trade_details: bool = False,     
-                       limit: int = 1000,                                                                
+                       limit: int = 1000,     
+                       start_date: datetime = None,
+                       end_date: datetime = None
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
@@ -221,7 +223,10 @@ class StrategyBase(StrategyModel):
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
             limit:          orders to retrieve
         '''
-        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit, start_date=self.start_date)
+        start_date = start_date if start_date is not None else self.start_date   
+        end_date = end_date if end_date is not None else datetime(2100,1,1)
+        
+        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
         return df_orders        
     

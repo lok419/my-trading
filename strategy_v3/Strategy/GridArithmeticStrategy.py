@@ -186,7 +186,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             When status is RUN, grid status is IDLE and time-series is not random => place grid orders            
         '''
-        if self.status == STATUS.RUN and grid_status == GRID_STATUS.IDLE and ts_prop != TS_PROP.RANDOM:            
+        if self.status == STATUS.RUN and grid_status == GRID_STATUS.IDLE :#and ts_prop != TS_PROP.RANDOM:          
             center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
             current_vol = vol
             current_px = open if self.is_backtest() else close
@@ -378,44 +378,44 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         current_vol = data['atr']      
         center_px = stoploss = grid_type = None
         
-        if ts_prop == TS_PROP.MEAN_REVERT:            
+        #if ts_prop == TS_PROP.MEAN_REVERT:            
             # make sure the current price are same as moving average
-            if current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale:
-                center_px = current_px
-                stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
-                grid_type = GRID_TYPE.MEAN_REVERT
+        if current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale:
+            center_px = current_px
+            stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
+            grid_type = GRID_TYPE.MEAN_REVERT
 
-        elif ts_prop == TS_PROP.MOMENTUM:    
+        #elif ts_prop == TS_PROP.MOMENTUM:    
             # conservative approach on momentum filters
-            if current_px > close_sma and current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:                            
-                '''
-                    Momentum Up Order
-                        Upper Bound = same as mean revert. vol_grid_scale references to center price
-                        Lower Bound = need to make sure it won't trigger immediately. reference to 
-                            1. current price and 
-                            2. vol_stoploss_scale => this is derivation tolerance from the grid boundary
-                '''
-                center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale                      
-                stoploss = (
-                    current_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale,
-                    center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale
-                )                
-                grid_type = GRID_TYPE.MOMENTUM_UP                
+        elif current_px > close_sma and current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:                            
+            '''
+                Momentum Up Order
+                    Upper Bound = same as mean revert. vol_grid_scale references to center price
+                    Lower Bound = need to make sure it won't trigger immediately. reference to 
+                        1. current price and 
+                        2. vol_stoploss_scale => this is derivation tolerance from the grid boundary
+            '''
+            center_px = current_px + (self.grid_size+1) * current_vol * self.vol_grid_scale                      
+            stoploss = (
+                current_px - self.vol_stoploss_scale * current_vol * self.vol_grid_scale,
+                center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale
+            )                
+            grid_type = GRID_TYPE.MOMENTUM_UP                
 
-            elif current_px < close_sma and current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:            
-                '''
-                    Momentum Down Order
-                        Upper Bound = need to make sure it won't trigger immediately. reference to                         
-                            1. current price and 
-                            2. vol_stoploss_scale => this is derivation tolerance from the grid boundary
-                        Lower Bound = same as mean revert. vol_grid_scale references to center price
-                '''
-                center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
-                stoploss = (
-                    center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale,
-                    current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale
-                )
-                grid_type = GRID_TYPE.MOMENTUM_DOWN
+        elif current_px < close_sma and current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:            
+            '''
+                Momentum Down Order
+                    Upper Bound = need to make sure it won't trigger immediately. reference to                         
+                        1. current price and 
+                        2. vol_stoploss_scale => this is derivation tolerance from the grid boundary
+                    Lower Bound = same as mean revert. vol_grid_scale references to center price
+            '''
+            center_px = current_px - (self.grid_size+1) * current_vol * self.vol_grid_scale
+            stoploss = (
+                center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale,
+                current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale
+            )
+            grid_type = GRID_TYPE.MOMENTUM_DOWN
 
         return center_px, stoploss, grid_type
 
@@ -487,14 +487,16 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     def get_all_orders(self, 
                        query_all: bool = False,
                        trade_details: bool = False,     
-                       limit: int = 1000,                                         
+                       limit: int = 1000,  
+                       start_date: datetime = None,
+                       end_date: datetime = None,                                       
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
             query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
         '''
-        df_orders = super().get_all_orders(query_all=query_all, trade_details=trade_details, limit=limit)
+        df_orders = super().get_all_orders(query_all=query_all, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
                 
         # some manual adjusting on orders id
         df_orders['clientOrderId'] = np.where(df_orders['orderId'] == 249865056, 'grid_SOLFDUSDv1_gridid4_MD_close', df_orders['clientOrderId'])

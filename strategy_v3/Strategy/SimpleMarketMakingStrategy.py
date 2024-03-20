@@ -111,11 +111,12 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         r, spread, order_bid, order_ask, mid_px, vwmp = self.derive_bid_ask_order(current_position, df_bids, df_asks, adv, vol)        
 
         self.cancel_all_orders(limit=50, silence=True)
-        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
+        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, skew: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
             self.status.name, ts_prop.name, hurst_exponent, 
             round(current_position, self.qty_decimal), 
             round(mid_px, self.price_decimal), 
             round(vwmp, self.price_decimal), 
+            round(vwmp - mid_px, self.price_decimal), 
             round(r, self.price_decimal), 
             round(spread, self.price_decimal),
             round(vol, self.price_decimal), 
@@ -237,15 +238,17 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
     def get_all_orders(self, 
                        query_all: bool = False,
                        trade_details: bool = False,     
-                       limit: int = 1000,                               
+                       limit: int = 1000,  
+                       start_date: datetime = None,
+                       end_date: datetime = None,                             
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)
             query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
         '''
-
-        df_orders = super().get_all_orders(query_all=query_all, trade_details=trade_details, limit=limit)   
+        
+        df_orders = super().get_all_orders(query_all=query_all, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)   
 
         # find the grid_id of orders
         df_orders['mm_id'] = df_orders['clientOrderId'].apply(lambda x: int(re.search(r"(?<=id)\d+(?=_)", x)[0]))
