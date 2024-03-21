@@ -3,7 +3,7 @@ import warnings
 import sys
 from strategy_v3.Executor import ExecutorBinance
 from strategy_v3.DataLoader import DataLoaderBinance
-from strategy_v3.ExecuteSetup import StrategyFactory
+from strategy_v3.ExecuteSetup.StrategyFactory import StrategyFactory
 
 warnings.filterwarnings('ignore')
 

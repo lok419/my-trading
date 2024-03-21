@@ -2,7 +2,8 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from utils.credentials import TELEGRAM_BOT_API_KEY, NGROK_DOMAIN, NGROK_PORT_TUNNEL, NGROK_DOMAIN_URL
-from strategy_v3.ExecuteSetup import ExecuteSetup, StrategyFactory
+from strategy_v3.ExecuteSetup import ExecuteSetup
+from strategy_v3.ExecuteSetup.StrategyFactory import StrategyFactory
 from strategy_v3.DataLoader import DataLoaderBinance
 from strategy_v3.Executor import ExecutorBinance
 from tabulate import tabulate
