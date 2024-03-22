@@ -354,17 +354,37 @@ class Binance(AccountModel):
         '''
         orders = self.client.get_order_book(symbol=instrument, limit=limit)
 
-        df_bids = pd.DataFrame({'price': list(zip(*orders['bids']))[0], 'quantity': list(zip(*orders['bids']))[1]})
-        df_asks = pd.DataFrame({'price': list(zip(*orders['asks']))[0], 'quantity': list(zip(*orders['bids']))[1]})
+        df_bid = pd.DataFrame({'price': list(zip(*orders['bids']))[0], 'quantity': list(zip(*orders['bids']))[1]})
+        df_ask = pd.DataFrame({'price': list(zip(*orders['asks']))[0], 'quantity': list(zip(*orders['bids']))[1]})
 
-        df_bids['price'] = df_bids['price'].astype('float')
-        df_bids['quantity'] = df_bids['quantity'].astype('float')
-        df_bids = df_bids.sort_values('price', ascending=False)
-        df_bids['quantity_cum'] = df_bids['quantity'].cumsum()
+        df_bid['price'] = df_bid['price'].astype('float')
+        df_bid['quantity'] = df_bid['quantity'].astype('float')
+        df_bid = df_bid.sort_values('price', ascending=False)
+        df_bid['quantity_cum'] = df_bid['quantity'].cumsum()
 
-        df_asks['price'] = df_asks['price'].astype('float')
-        df_asks['quantity'] = df_asks['quantity'].astype('float')
-        df_asks = df_asks.sort_values('price')
-        df_asks['quantity_cum'] = df_asks['quantity'].cumsum()
+        df_ask['price'] = df_ask['price'].astype('float')
+        df_ask['quantity'] = df_ask['quantity'].astype('float')
+        df_ask = df_ask.sort_values('price')
+        df_ask['quantity_cum'] = df_ask['quantity'].cumsum()
 
-        return df_bids, df_asks
+        return df_bid, df_ask
+    
+    def get_aggregate_trades(self, instrument:str, start_date:datetime|str) -> tuple[DataFrame, DataFrame]:
+        '''
+            Get Market Aggregated Trades
+        '''        
+        agg_trades = self.client.aggregate_trade_iter(symbol=instrument, start_str=start_date)
+
+        trades = [x for x in agg_trades]
+        trades = pd.DataFrame(trades)
+        trades.columns = ['aggregate tradeId', 'price', 'quantity', 'first tradeId', 'last tradeId', 'time', 'isBuyerMaker', 'isBestMatch']
+        trades['time'] = pd.to_datetime(trades['time'], unit='ms')        
+        trades['time'] = trades['time'].dt.tz_localize('UTC').dt.tz_convert(Binance().target_tz)
+        trades['price'] = trades['price'].astype(float)
+        trades['quantity'] = trades['quantity'].astype(float)
+
+        df_trades_bid = trades[trades['isBuyerMaker'] == True]
+        df_trades_ask = trades[trades['isBuyerMaker'] == False]
+
+        return df_trades_bid, df_trades_ask
+        

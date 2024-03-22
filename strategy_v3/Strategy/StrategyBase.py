@@ -7,7 +7,7 @@ from datetime import datetime
 from utils.logging import get_logger
 from pandas.core.frame import DataFrame
 from zoneinfo import ZoneInfo
-from requests.exceptions import Timeout
+from requests.exceptions import Timeout, ConnectionError
 from binance.exceptions import BinanceAPIException
 from strategy_v3.Misc import CustomException
 import pandas as pd
@@ -139,6 +139,13 @@ class StrategyBase(StrategyModel):
         '''  
         self.df_bids, self.df_asks = self.executor.get_order_book(self.instrument, limit=limit) 
         return self.df_bids, self.df_asks
+    
+    def get_aggregate_trades(self, start_date) -> tuple[DataFrame, DataFrame]:
+        '''
+            Get market aggregate trades
+        '''
+        df_trades_bid, df_trades_ask = self.executor.get_aggregate_trades(self.instrument, start_date=start_date)
+        return df_trades_bid, df_trades_ask 
 
     def execute(self, data):
         pass    
@@ -292,6 +299,12 @@ class StrategyBase(StrategyModel):
                     self.logger.error(e)        
                     self.logger.error('handled explicitly. retring....')
 
+                except ConnectionError as e:
+                    traceback.print_exception(e)
+                    self.logger.error(e)     
+                    self.logger.error('retrying')
+                    sleep(60)
+
                 except BinanceAPIException as e:
                     traceback.print_exception(e)
                     self.logger.error(e)                
@@ -302,8 +315,8 @@ class StrategyBase(StrategyModel):
                         self.logger.error('handled explicitly. retring....')
                         sleep(30)
                     else:
-                        raise(e)                                        
-                                    
+                        raise(e)                      
+                                                                                              
                 except CustomException as e:
                     traceback.print_exception(e)
                     self.logger.error(e)    

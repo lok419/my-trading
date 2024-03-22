@@ -107,8 +107,10 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 self.close_out_positions()        
             return
         
-        df_bids, df_asks = self.get_order_book()    
-        r, spread, order_bid, order_ask, mid_px, vwmp = self.derive_bid_ask_order(current_position, df_bids, df_asks, adv, vol)        
+        df_bid, df_ask = self.get_order_book()    
+        df_trades_bid, df_trades_ask = self.get_aggregate_trades(start_date=f'{self.refresh_interval} seconds ago')
+
+        r, spread, order_bid, order_ask, mid_px, vwmp = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)        
 
         self.cancel_all_orders(limit=50, silence=True)
         self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, skew: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
@@ -130,7 +132,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         '''        
         super().run(lookback='2 hours ago')
 
-    def derive_bid_ask_order(self, current, df_bids, df_asks, adv, vol):
+    def derive_bid_ask_order(self, current, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol):
         '''
             Derive the bid ask price of the maker LIMIT order based on Stoikov Maket Making Model
 
@@ -138,6 +140,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 - distance between current position and target position
                 - inventory risk (volatility / inventory risk aversion factor)
                 - time until market close (NOT APPLICABLE FOR CRYPTO)  
+                - mid price is replaced by volume weighted mid price
 
             2. Spread - spread is aimed to capture x% of the ADV
                 - flow target = x% * ADV
@@ -149,24 +152,21 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         
         flow_target = adv * self.spread_adv_factor
 
-        spread_ask = df_asks[df_asks['quantity_cum'] > flow_target/2]['price'].min()
-        spread_bid = df_bids[df_bids['quantity_cum'] > flow_target/2]['price'].max()        
+        spread_ask = df_ask[df_ask['quantity_cum'] > flow_target/2]['price'].min()
+        spread_bid = df_bid[df_bid['quantity_cum'] > flow_target/2]['price'].max()        
         spread = spread_ask - spread_bid 
 
-        best_bid = df_bids.iloc[0]['price']
-        best_ask = df_asks.iloc[0]['price']
-        mid_px = (df_asks.iloc[0]['price'] + df_bids.iloc[0]['price']) / 2
+        best_bid = df_bid.iloc[0]['price']
+        best_ask = df_ask.iloc[0]['price']
+        mid_px = (best_ask + best_bid)/2
 
-        vw_ask = df_asks[df_asks['quantity_cum'] <= adv/2]
-        vw_ask = (vw_ask['price'] * vw_ask['quantity']).sum() / vw_ask['quantity'].sum()
-        vw_bid = df_bids[df_bids['quantity_cum'] <= adv/2]
-        vw_bid = (vw_bid['price'] * vw_bid['quantity']).sum() / vw_bid['quantity'].sum()
-        vwmp = (vw_ask + vw_bid) / 2
+        vw_bid = (df_trades_bid['price'] * df_trades_bid['quantity']).sum() / df_trades_bid['quantity'].sum()
+        vw_ask = (df_trades_ask['price'] * df_trades_ask['quantity']).sum() / df_trades_ask['quantity'].sum()
+        vwmp = (vw_ask + vw_bid) / 2                
 
         r = vwmp - (current - self.target_position) * self.gamma * vol ** 2
         order_bid = min(r - spread/2, best_bid)
         order_ask = max(r + spread/2, best_ask)
-
         new_spread = order_ask - order_bid
 
         return r, new_spread, order_bid, order_ask, mid_px, vwmp
@@ -256,7 +256,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         # find the grid trade type (grid/stoploss/close)
         df_orders['mm_tt'] = df_orders['clientOrderId'].apply(lambda x: x.split('_')[-1]).apply(lambda x: re.sub(r'[0-9]', '', x))             
 
-        return df_orders      
+        return df_orders     
     
     def close_out_positions(self,                                                         
                             type:str = 'close',

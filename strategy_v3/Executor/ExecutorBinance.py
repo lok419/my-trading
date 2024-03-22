@@ -100,6 +100,12 @@ class ExecutorBinance(ExecutorModel):
             Get Live Order book from binance
         '''
         return self.binance.get_order_book(instrument=instrument, limit=limit)
+    
+    def get_aggregate_trades(self, instrument, start_date: datetime|str) -> tuple[DataFrame, DataFrame]:
+        '''
+            Get aggregated trades
+        '''
+        return self.binance.get_aggregate_trades(instrument=instrument, start_date=start_date)
 
 
         
