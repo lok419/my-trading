@@ -387,8 +387,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             grid_type = GRID_TYPE.MEAN_REVERT
 
         #elif ts_prop == TS_PROP.MOMENTUM:    
-            # conservative approach on momentum filters
-        elif current_px > close_sma and current_px > data['Close_t5'] and data['Close_t5'] > data['Close_t10']:                            
+        # conservative approach on momentum filters
+        elif current_px > close_sma and current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:                            
             '''
                 Momentum Up Order
                     Upper Bound = same as mean revert. vol_grid_scale references to center price
@@ -403,7 +403,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             )                
             grid_type = GRID_TYPE.MOMENTUM_UP                
 
-        elif current_px < close_sma and current_px < data['Close_t5'] and data['Close_t5'] < data['Close_t10']:            
+        elif current_px < close_sma and current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:
             '''
                 Momentum Down Order
                     Upper Bound = need to make sure it won't trigger immediately. reference to                         
