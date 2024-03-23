@@ -1,11 +1,13 @@
 from datetime import datetime
 from pandas.core.frame import DataFrame
 from strategy_v3.Strategy import STATUS, StrategyBase, MarketMakingPerformance
+from strategy_v3.Strategy.Constant import TS_PROP
+from utils.stats import time_series_hurst_exponent
 import numpy as np
 import re
-from strategy_v3.Strategy.Constant import TS_PROP
+import os
+import pandas as pd
 
-from utils.stats import time_series_hurst_exponent
 
 class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):    
 
@@ -99,8 +101,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         current_position = self.get_current_position()
         ts_prop = self.get_ts_prop(data)
 
-        if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN:    
-        #if self.status != STATUS.RUN:    
+        if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN:            
             self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal)))
             self.cancel_all_orders(limit=50, silence=True)            
             if round(abs(current_position), self.qty_decimal) != 0:                                
@@ -109,8 +110,12 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         
         df_bid, df_ask = self.get_order_book()    
         df_trades_bid, df_trades_ask = self.get_aggregate_trades(start_date=f'{self.refresh_interval} seconds ago')
-
         r, spread, order_bid, order_ask, mid_px, vwmp = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)        
+
+        # Arrival rate
+        ar_bid = df_trades_bid['quantity'].sum()/self.refresh_interval
+        ar_ask = df_trades_ask['quantity'].sum()/self.refresh_interval
+        ar_skew = ar_ask - ar_bid
 
         self.cancel_all_orders(limit=50, silence=True)
         self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, skew: {}, r: {}, spread: {}, vol: {}, adv: {}. creating new bid ask orders.....'.format(
@@ -124,7 +129,28 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             round(vol, self.price_decimal), 
             round(adv, self.qty_decimal)
         ))             
+        
         self.place_bid_ask_order([order_bid], [order_ask], mid_px, date)
+
+        data = {
+            'vol': vol,
+            'adv': adv,
+            'hurst_exponent': hurst_exponent,
+            'ts_prop': ts_prop.name,
+            'inv': current_position,
+            'reservation_price': r,
+            'mid_price': mid_px,
+            'vwmp': vwmp,
+            'skew': vwmp - mid_px,
+            'spread': spread,
+            'order_bid': order_bid,
+            'order_ask': order_ask,
+            'ar_bid': ar_bid,
+            'ar_ask': ar_ask,
+            'ar_skew': ar_skew,
+            'comment': 'vwmp by weighted executed order price'
+        }
+        self.log_data(data)
 
     def run(self):
         '''
@@ -273,3 +299,37 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             '''
             order_id = order_id = f'{self.__str__()}_id{self.mm_id}_{type}'
             super().close_out_positions(type=type, price=price, order_id=order_id, date=date)
+
+    def log_data(self, data: dict = dict()):
+        '''
+            Log the strategy data for each execute()
+        '''
+        try:
+            log = {}
+            # strategy parameters            
+            log['date'] = self.get_current_time()
+            log['strategy_id'] = self.strategy_id
+            log['interval'] = self.interval
+            log['refresh_interval'] = self.refresh_interval
+            log['gamma'] = self.gamma
+            log['spread_adv_factor'] = self.spread_adv_factor
+            log['target_position'] = self.target_position
+            log['position_size'] = self.position_size
+            log['hurst_exp_mo_threshold'] = self.hurst_exp_mo_threshold
+            log['hurst_exp_mr_threshold'] = self.hurst_exp_mr_threshold
+            log['status'] = self.status.name   
+
+            # execute data
+            log.update(data)
+            log = pd.DataFrame([log])
+
+            log_df = self.get_log_data()
+            if log_df is not None:
+                log_df = pd.concat([log_df, log])
+            else:
+                log_df = log
+
+            log_df.to_hdf(self.log_path, key='log', format='table')
+
+        except Exception as e:
+            self.logger.error(e)

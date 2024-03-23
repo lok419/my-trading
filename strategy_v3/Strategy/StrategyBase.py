@@ -13,6 +13,7 @@ from strategy_v3.Misc import CustomException
 import pandas as pd
 import random
 import traceback
+import os
 
 
 class StrategyBase(StrategyModel):    
@@ -59,7 +60,7 @@ class StrategyBase(StrategyModel):
         self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
         self.interval_min = int(self.interval.replace('m', ''))
         self.execute_start_time = self.get_current_time()        
-        
+
     def __str__(self):
         return '{}_{}'.format("".join([x for x in self.__class__.__name__ if x.isupper()]), self.strategy_id)
     
@@ -117,7 +118,8 @@ class StrategyBase(StrategyModel):
             id:     The strategy name            
         '''
         self.strategy_id = id
-        self.logger.name = self.__str__()        
+        self.logger.name = self.__str__()                      
+        self.log_path = os.path.dirname(__file__) + f'/log/{id}.h5'  
 
     def is_backtest(self):
         return type(self.executor) is ExecutorBacktest
@@ -333,3 +335,19 @@ class StrategyBase(StrategyModel):
             self.logger.error(e)                
             self.cancel_all_orders()
             self.close_out_positions()
+
+    def log_data(self, data: dict = dict()):
+        '''
+            Log the strategy data for each execute()
+        '''
+        raise('Not Implemented.')
+
+    def get_log_data(self) -> DataFrame:
+        '''
+            Get the strategy data log
+        '''
+        try:
+            return pd.read_hdf(self.log_path, key='log', mode='r')
+        except Exception as e:
+            self.logger.error(e)
+            return None
