@@ -57,21 +57,22 @@ class GridPerformance(StrategyPerformance):
             display(df_pnl_metrics)
 
         fig = make_subplots(
-            rows=5, cols=1, 
+            rows=6, cols=1, 
             shared_xaxes=True, 
             vertical_spacing=0.05,             
             subplot_titles=[
-                'Price OHLC',     
+                'Price OHLC',
+                'Volume',
                 'Cumulated PnL / Return (%)', 
                 f'Average True Range / Close Std ({self.vol_lookback} x {self.interval})',
                 'Half Life',
                 'Hurst Exponent',                
             ],         
-            row_heights=[0.8, 0.2, 0.2, 0.2, 0.2],  
+            row_heights=[0.8, 0.1, 0.2, 0.2, 0.2, 0.2],  
         )
         fig.update_layout(
             title=self.instrument,
-            width=1500, height=1600,        
+            width=1500, height=1800,        
             hovermode='x',
         )        
 
@@ -79,6 +80,12 @@ class GridPerformance(StrategyPerformance):
         sma_name = f'SMA {self.vol_lookback}d'
         fig.add_trace(go.Candlestick(x=df["Date"], open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], name="OHLC", legendgroup='OHCL'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df["Date"], y=df['close_sma'], name=sma_name, legendgroup=sma_name, marker=dict(color=colors[0])), row=1, col=1)
+
+        # Volume
+        df_up = df[df['Close'] > df['Open']]
+        df_down = df[df['Close'] <= df['Open']]
+        fig.add_trace(go.Bar(x=df_up['Date'], y=df_up['Volume'], showlegend=False, marker=dict(color=colors[2])), row=2, col=1)
+        fig.add_trace(go.Bar(x=df_down['Date'], y=df_down['Volume'], showlegend=False, marker=dict(color=colors[3])), row=2, col=1)    
         fig.update(layout_xaxis_rangeslider_visible=False)
 
         if plot_orders:
@@ -131,31 +138,31 @@ class GridPerformance(StrategyPerformance):
             fig.add_trace(go.Scatter(x=filled_close_sell['updateTime'], y=filled_close_sell['fill_price'], marker=dict(color='red',size=15), mode='markers', marker_symbol='x', name='Sell to Close'),row=1, col=1)
 
         # Net PnL
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_cum"]*100, name='Cumulative Return (%)'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["return_cum"]*100, name='Cumulative Return (%) - Mean Revert', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["return_cum"]*100, name='Cumulative Return (%) - Momentum Up', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["return_cum"]*100, name='Cumulative Return (%) - Momentum Down', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_cum"]*100, name='Cumulative Return (%)'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["return_cum"]*100, name='Cumulative Return (%) - Mean Revert', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["return_cum"]*100, name='Cumulative Return (%) - Momentum Up', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["return_cum"]*100, name='Cumulative Return (%) - Momentum Down', visible='legendonly'), row=3, col=1)
 
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_cum"], name='Cumulative PnL (Fiat)', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["pnl_cum"], name='Cumulative PnL (Fiat) - Mean Revert', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["pnl_cum"], name='Cumulative PnL (Fiat) - Momentum Up', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["pnl_cum"], name='Cumulative PnL (Fiat) - Momentum Down', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_cum"], name='Cumulative PnL (Fiat)', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["pnl_cum"], name='Cumulative PnL (Fiat) - Mean Revert', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["pnl_cum"], name='Cumulative PnL (Fiat) - Momentum Up', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["pnl_cum"], name='Cumulative PnL (Fiat) - Momentum Down', visible='legendonly'), row=3, col=1)
 
         fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl"], name='PnL (Fiat)', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["pnl"], name='PnL (Fiat) - Mean Revert', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["pnl"], name='PnL (Fiat) - Momentum Up', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["pnl"], name='PnL (Fiat) - Momentum Down', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mr["pnl"], name='PnL (Fiat) - Mean Revert', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_mu["pnl"], name='PnL (Fiat) - Momentum Up', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl_md["pnl"], name='PnL (Fiat) - Momentum Down', visible='legendonly'), row=3, col=1)
 
         # Gross PnL                
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_gross_cum"]*100, name='Cumulative Gross Return (%)', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_gross_cum"], name='Cumulative Gross PnL (Fiat)', visible='legendonly'), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["trading_fee_cum"], name='Cumulative Trading Fee (Fiat)', visible='legendonly'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["return_gross_cum"]*100, name='Cumulative Gross Return (%)', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["pnl_gross_cum"], name='Cumulative Gross PnL (Fiat)', visible='legendonly'), row=3, col=1)
+        fig.add_trace(go.Scatter(x=df_pnl["Date"], y=df_pnl["trading_fee_cum"], name='Cumulative Trading Fee (Fiat)', visible='legendonly'), row=3, col=1)
 
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['atr'], name='Average True Range'), row=3,col=1)
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['close_std'], name='Close Std'), row=3,col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['atr'], name='Average True Range'), row=4,col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['close_std'], name='Close Std'), row=4,col=1)
 
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['half_life'], showlegend=False), row=4,col=1)
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=5,col=1)        
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['half_life'], showlegend=False), row=5,col=1)
+        fig.add_trace(go.Scatter(x=df['Date'], y=df['hurst_exponent'], showlegend=False), row=6,col=1)        
 
         if len(save_jpg_path) == 0:
             fig.show()
