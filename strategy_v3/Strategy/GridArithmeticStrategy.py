@@ -1,5 +1,6 @@
 from strategy_v3.ExecuteSetup import ExecuteSetup
-from strategy_v3.Strategy import GridPerformance, TS_PROP, GRID_TYPE, GRID_STATUS, STATUS, StrategyBase
+from strategy_v3.Strategy import TS_PROP, GRID_TYPE, GRID_STATUS, STATUS, StrategyBase
+from strategy_v3.Strategy.Performance import GridPerformance
 from datetime import datetime
 from utils.stats import time_series_half_life, time_series_hurst_exponent
 from pandas.core.frame import DataFrame

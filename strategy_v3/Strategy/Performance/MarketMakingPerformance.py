@@ -3,7 +3,8 @@ from pandas.core.frame import DataFrame
 from utils.performance import get_latest_risk_free_rate, maximum_drawdown
 from utils.data_helper import title_case
 from IPython.display import display
-from strategy_v3.Strategy import GRID_TYPE, StrategyPerformance
+from strategy_v3.Strategy import GRID_TYPE
+from strategy_v3.Strategy.Performance import StrategyPerformance
 from datetime import timedelta
 import plotly.graph_objects as go
 import plotly

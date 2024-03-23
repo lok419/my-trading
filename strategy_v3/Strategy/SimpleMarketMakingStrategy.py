@@ -1,6 +1,7 @@
 from datetime import datetime
 from pandas.core.frame import DataFrame
-from strategy_v3.Strategy import STATUS, StrategyBase, MarketMakingPerformance
+from strategy_v3.Strategy import STATUS, StrategyBase
+from strategy_v3.Strategy.Performance import MarketMakingPerformance
 from strategy_v3.Strategy.Constant import TS_PROP
 from utils.stats import time_series_hurst_exponent
 import numpy as np
