@@ -8,6 +8,8 @@ from strategy_v3.DataLoader import DataLoaderBinance
 from strategy_v3.Executor import ExecutorBinance
 from tabulate import tabulate
 from utils.logging import get_logger
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import warnings
 import tempfile
@@ -30,6 +32,20 @@ default_update_options = {
     'hurst_exp_mr_threshold': [0, 0.4, 0.5, 0.6],
     'hurst_exp_mo_threshold': [0.6, 0.7, 0.8, 1],        
 }
+
+def time_str(time: str) -> str:
+    '''
+        Translate time to timestr
+    '''
+    if time == 'LTD':
+        time = ''
+    if time == 'Today':
+        date = datetime.today()
+        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
+        date = date.astimezone(ZoneInfo("UTC"))
+        time = date.strftime('%Y-%m-%d %H:%M:%S')
+    
+    return time
 
 def handler_print(func):
     '''
@@ -99,7 +115,7 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton(text='Stop', callback_data=f'/update {s} status STOP'),        
     ])
 
-    times = ['2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago', 'LTD']
+    times = ['Today', '2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago', 'LTD']
     for t in times:
         button_list.append([InlineKeyboardButton(text=t, callback_data='/')])
         button_list.append([
@@ -187,7 +203,7 @@ async def pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''        
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])    
-    time = "" if time == 'LTD' else time
+    time = time_str(time)
 
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
@@ -206,8 +222,8 @@ async def plot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         Plot summary of strategy performance
     '''    
     strategy_id = context.args[0]
-    time = " ".join(context.args[1:])    
-    time = "" if time == 'LTD' else time
+    time = " ".join(context.args[1:])
+    time = time_str(time)
 
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
@@ -227,7 +243,7 @@ async def summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''    
     strategy_id = context.args[0]
     time = " ".join(context.args[1:])
-    time = "" if time == 'LTD' else time
+    time = time_str(time)
     
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
