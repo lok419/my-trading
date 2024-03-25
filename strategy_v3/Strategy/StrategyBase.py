@@ -316,6 +316,9 @@ class StrategyBase(StrategyModel):
                     elif e.code == -1001:
                         self.logger.error('handled explicitly. retring....')
                         sleep(30)
+                    elif e.code == -1003:
+                        self.logger.error('handled explicitly. retring....')
+                        sleep(30)
                     else:
                         raise(e)                      
                                                                                               
