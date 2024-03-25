@@ -89,6 +89,15 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             return TS_PROP.MOMENTUM        
         else:
             return TS_PROP.RANDOM
+        
+    def is_close_period(self):
+        '''
+            Strategy close period            
+            Every night 23:55 - 00:05, we close out all positions and the pnl/orders for next day will be referenced to this.
+            Because of the number of orders, sometime it is confused when we reference to an time where the market making is in process, and the pnl/orders wil be mess-up
+        '''
+        time = self.get_current_time()
+        return (time.hour == 23 and time.minute >= 55) or (time.hour == 0 and time.minute <= 5)
 
     def execute(self, data):
         '''
@@ -101,15 +110,16 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
 
         current_position = self.get_current_position()
         ts_prop = self.get_ts_prop(data)
-
-        if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN:            
-            self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal)))
+        is_closed = self.is_close_period()
+        
+        if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN or is_closed:      
+            self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, is_closed: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal), is_closed))
             self.cancel_all_orders(limit=50, silence=True)            
             if round(abs(current_position), self.qty_decimal) != 0:                                
                 self.close_out_positions()        
             return
         
-        df_bid, df_ask = self.get_order_book(limit=2000)    
+        df_bid, df_ask = self.get_order_book(limit=5000)    
         df_trades_bid, df_trades_ask = self.get_aggregate_trades(start_date=f'{self.refresh_interval} seconds ago')
         r, spread, order_bid, order_ask, mkt_sprd, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2 = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)                
 
