@@ -2,10 +2,11 @@ from binance.client import Client
 from utils.credentials import BINANCE_API_KEY, BINANCE_API_SECRET
 from pandas.core.frame import DataFrame
 from account import AccountModel
-import pandas as pd
-import numpy as np
 from datetime import datetime
 from utils.logging import get_logger
+from zoneinfo import ZoneInfo
+import pandas as pd
+import numpy as np
 
 class Binance(AccountModel):
     '''
@@ -24,8 +25,8 @@ class Binance(AccountModel):
         self.default_orders = DataFrame(columns=['symbol', 'clientOrderId', 'price', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId'], )        
         self.default_orders['updateTime'] = pd.to_datetime(self.default_orders['updateTime'])
         self.default_orders['time'] = pd.to_datetime(self.default_orders['time'])
-        self.default_orders ['updateTime'] = self.default_orders ['updateTime'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
-        self.default_orders ['time'] = self.default_orders ['time'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
+        self.default_orders ['updateTime'] = self.default_orders['updateTime'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
+        self.default_orders ['time'] = self.default_orders['time'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
 
     def get_client(self) -> Client:
         """
@@ -148,10 +149,9 @@ class Binance(AccountModel):
         return order
     
     def get_all_orders(self,
-                       instrument:str,    
-                       query_all: bool = False,                       
-                       start_date: datetime = datetime(2000,1,1),
-                       end_date: datetime = datetime(2100,1,1),
+                       instrument:str,                           
+                       start_date: datetime = datetime(2000,1,1, tzinfo=ZoneInfo('HongKong')),
+                       end_date: datetime = datetime(2100,1,1, tzinfo=ZoneInfo('HongKong')),
                        trade_details: bool = False,
                        limit: int = 1000,
                        ) -> DataFrame:
@@ -164,29 +164,26 @@ class Binance(AccountModel):
             trade_details:  true to add more trade details (filled px, commission.....)
 
             Binance API returns max orders of 1000, in order to query all orders, we need to query by batch
-        '''        
-        if query_all:            
-            orders = []        
-            start_date_ts = int(datetime.timestamp(start_date)) * 1000
-            end_date_ts = int(datetime.timestamp(end_date)) * 1000
-            date_ts = end_date_ts
+        '''                     
+        orders = []        
+        start_date_ts = int(datetime.timestamp(start_date)) * 1000
+        end_date_ts = int(datetime.timestamp(end_date)) * 1000
+        date_ts = end_date_ts
 
-            while date_ts >= start_date_ts:
-                orders_page = self.client.get_all_orders(symbol=instrument, limit=limit, endTime=date_ts)
-                self.logger.debug('Fetching {} orders...'.format(len(orders_page)))
+        while date_ts >= start_date_ts:
+            orders_page = self.client.get_all_orders(symbol=instrument, limit=limit, endTime=date_ts)
+            self.logger.debug('Fetching {} orders...'.format(len(orders_page)))
 
-                min_date_ts = min([o['time'] for o in orders_page])
-                orders = orders_page + orders                
+            min_date_ts = min([o['time'] for o in orders_page])
+            orders = orders_page + orders                
 
-                if len(orders_page) < 1000:
-                    break
+            if len(orders_page) < 1000:
+                break
 
-                if min_date_ts < start_date_ts:
-                    break
+            if min_date_ts < start_date_ts:
+                break
 
-                date_ts = min_date_ts - 1            
-        else:
-            orders = self.client.get_all_orders(symbol=instrument, limit=limit)
+            date_ts = min_date_ts - 1            
              
         orders = pd.DataFrame(orders)
 
@@ -212,7 +209,7 @@ class Binance(AccountModel):
             '''
                 one orderID could have multiple trades, need to calculate the wavg filled price
             '''
-            trades = self.get_all_trades(instrument, query_all=query_all, start_date=start_date, end_date=end_date)            
+            trades = self.get_all_trades(instrument, start_date=start_date, end_date=end_date)            
             trades['trade'] = 1
             trades = trades[['orderId', 'price', 'commission', 'commissionAsset', 'isBuyer', 'isMaker', 'isBestMatch', 'qty', 'trade']]
             trades = trades.rename(columns={'price': 'fill_price'})
@@ -296,10 +293,9 @@ class Binance(AccountModel):
         return fees
     
     def get_all_trades(self, 
-                       instrument: str,
-                       query_all: bool = False,                
-                       start_date: datetime = datetime(2000,1,1),
-                       end_date: datetime = datetime(2100,1,1),
+                       instrument: str,                                      
+                       start_date: datetime = datetime(2000,1,1, tzinfo=ZoneInfo('HongKong')),
+                       end_date: datetime = datetime(2100,1,1, tzinfo=ZoneInfo('HongKong')),
         ) -> pd.DataFrame:
         '''
             Get all executed trades
@@ -312,29 +308,26 @@ class Binance(AccountModel):
 
             OrderID in trades are not unique (i.e. one order can have multiple trades)
         '''
+        trades = []        
+        start_date_ts = int(datetime.timestamp(start_date)) * 1000
+        end_date_ts = int(datetime.timestamp(end_date)) * 1000
+        date_ts = end_date_ts
 
-        if query_all:
-            trades = []        
-            start_date_ts = int(datetime.timestamp(start_date)) * 1000
-            end_date_ts = int(datetime.timestamp(end_date)) * 1000
-            date_ts = end_date_ts
+        while date_ts >= start_date_ts:
+            trades_page = self.client.get_my_trades(symbol=instrument, limit=1000, endTime=date_ts)
+            self.logger.debug('Fetching {} orders...'.format(len(trades_page)))
 
-            while date_ts >= start_date_ts:
-                trades_page = self.client.get_my_trades(symbol=instrument, limit=1000, endTime=date_ts)
-                self.logger.debug('Fetching {} orders...'.format(len(trades_page)))
+            min_date_ts = min([o['time'] for o in trades_page])
+            trades = trades_page + trades                
 
-                min_date_ts = min([o['time'] for o in trades_page])
-                trades = trades_page + trades                
+            if len(trades_page) < 1000:
+                break
 
-                if len(trades_page) < 1000:
-                    break
+            if min_date_ts < start_date_ts:
+                break
 
-                if min_date_ts < start_date_ts:
-                    break
-
-                date_ts = min_date_ts - 1            
-        else:
-            trades = self.client.get_my_trades(symbol=instrument, limit=1000)
+            date_ts = min_date_ts - 1            
+    
 
         if len(trades) == 0:
             return DataFrame()
@@ -347,6 +340,9 @@ class Binance(AccountModel):
         trades['qty'] = trades['qty'].astype(float)
         trades['quoteQty'] = trades['quoteQty'].astype(float)
         trades['commission'] = trades['commission'].astype(float)
+
+        trades = trades[trades['time'] >= start_date]
+        trades = trades[trades['time'] <= end_date]
 
         return trades
     

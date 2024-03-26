@@ -123,8 +123,7 @@ class StrategyPerformance(object):
         ret_std = np.std(ret_ts)
 
         pnl = df_pnl['pnl'].sum()
-        trading_fee = df_pnl['trading_fee'].sum()
-        #grid_count = len(df_orders['grid_id'].unique())
+        trading_fee = df_pnl['trading_fee'].sum()        
 
         sr = (ret_mean - rf_)/ret_std * np.sqrt(360*24*60/interval)        
         ret_cum = 1 + df_pnl['return_cum'].iloc[-1]
@@ -133,8 +132,7 @@ class StrategyPerformance(object):
 
         perf = {}   
         perf['pnl'] = pnl
-        perf['trading_fee'] = trading_fee   
-        #perf['grid_count'] = grid_count        
+        perf['trading_fee'] = trading_fee           
         perf['cumulative_return'] = ret_cum 
         perf['annualized_return'] = ret_mean_ann
         perf['annualized_volatility'] = ret_std_ann
@@ -147,7 +145,7 @@ class StrategyPerformance(object):
     
     def summary_table(self):
         df = self.df
-        df_orders = self.get_all_orders(query_all=True, trade_details=True)
+        df_orders = self.get_all_orders(trade_details=True)
         df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
         df_orders = df_orders[df_orders['updateTime'] >= df['Date'].min()]
         df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max() + timedelta(minutes=self.interval_min)]        

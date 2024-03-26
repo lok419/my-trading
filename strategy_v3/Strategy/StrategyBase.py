@@ -86,10 +86,10 @@ class StrategyBase(StrategyModel):
     @start_date.setter
     def start_date(self, start_date: str|datetime):
         if type(start_date) is datetime:
-            self._start_date = start_date
+            self._start_date = start_date.astimezone(tz=ZoneInfo('HongKong'))
         else:
             try:
-                self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S').astimezone(tz=ZoneInfo('HongKong')) 
             except:            
                 self._start_date = None                    
 
@@ -210,30 +210,29 @@ class StrategyBase(StrategyModel):
         '''
             Get current net position
         '''
-        all_orders = self.get_all_orders(query_all=True)    
+        all_orders = self.get_all_orders()    
         filled = all_orders[all_orders['status'] == 'FILLED']
         filled_net_qty = filled['NetExecutedQty'].sum()   
         filled_net_qty = round(filled_net_qty, self.qty_decimal)
         return filled_net_qty
                         
-    def get_all_orders(self, 
-                       query_all: bool = False,
+    def get_all_orders(self,                        
                        trade_details: bool = False,     
                        limit: int = 1000,     
                        start_date: datetime = None,
                        end_date: datetime = None
                        ) -> DataFrame:
         '''
-            Get all orders created by this object (using __str__ to determine if created by this object)
-
-            query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
+            Get all orders created by this object (using __str__ to determine if created by this object)            
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
-            limit:          orders to retrieve
+            limit:          number of orders per query
+            start_date:     query start date of the orders
+            end_date:       query end date of the orders
         '''
         start_date = start_date if start_date is not None else self.period_start
         end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=ZoneInfo("HongKong"))
         
-        df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
+        df_orders = self.executor.get_all_orders(self.instrument, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
         return df_orders        
     

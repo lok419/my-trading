@@ -84,7 +84,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         super().set_strategy_id(id)
 
         if reload and not self.is_backtest():
-            df_orders = self.get_all_orders(limit=10)
+            df_orders = self.get_all_orders(start_date=self.start_date)
             if len(df_orders) > 0:
                 grid_type = df_orders.iloc[-1]['grid_type']
                 grid_id = df_orders.iloc[-1]['grid_id']
@@ -220,7 +220,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             
             stop_px = stop_px if self.is_backtest() else None            
             self.cancel_all_orders()
-            self.close_out_positions('stoploss', stop_px, date, force=True)
+            self.close_out_positions('stoploss', stop_px, date)
 
         '''
             If status is terminate, cancel all orders and close out the positions
@@ -228,7 +228,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''        
         if self.status == STATUS.TERMINATE:
             self.cancel_all_orders()                        
-            self.close_out_positions('close', None, None, force=True)
+            self.close_out_positions('close', None, None)
             self.status = STATUS.STOP
             ExecuteSetup(self.strategy_id).update("status", STATUS.STOP.name, type(self))
 
@@ -301,8 +301,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     def close_out_positions(self,                                                         
                             type:str = 'close',
                             price: float = None,
-                            date:datetime = None,
-                            force: bool = False
+                            date:datetime = None,                            
                             ):
         '''
             Close out all outstanding positions based on Grid orders
@@ -312,29 +311,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             date:  only used for backtest
             force: force to close out entire position (usually done manually)
         '''
-        date = date if date is not None else self.get_current_time()
-        all_orders = self.get_all_orders(query_all=force)    
-
-        if not self.is_backtest() and not force:                          
-            all_orders = all_orders[all_orders['time'] > self.execute_start_time]           
-
-        '''
-            Force to flatten all delta based on LTD orders
-        '''
-        if force:            
-            filled = all_orders[all_orders['status'] == 'FILLED']
-            if self.grid_type is None:
-                self.grid_type = GRID_TYPE[all_orders.iloc[-1]['grid_type']]
-
-            if self.grid_id is None:
-                self.grid_id = all_orders.iloc[-1]['grid_id']
-
-        else:
-            last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]  
-            filled = last_grid[last_grid['status'] == 'FILLED']
-
-        filled_net_qty = filled['NetExecutedQty'].sum()   
-        filled_net_qty = round(filled_net_qty, self.qty_decimal)
+        filled_net_qty = self.get_current_position()
 
         if abs(filled_net_qty) > 0:
             self.logger.info('closing out net position of {} {}....'.format(filled_net_qty, self.instrument))
@@ -485,19 +462,20 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 order_id=order_id
             )             
 
-    def get_all_orders(self, 
-                       query_all: bool = False,
+    def get_all_orders(self,                        
                        trade_details: bool = False,     
                        limit: int = 1000,  
                        start_date: datetime = None,
                        end_date: datetime = None,                                       
                        ) -> DataFrame:
         '''
-            Get all orders created by this object (using __str__ to determine if created by this object)
-            query_all:      True if we want to get all orders. Otherwise, make one request to executor (e.g. Binance only return 1000 orders)
+            Get all orders created by this object (using __str__ to determine if created by this object)            
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
+            limit:          number of orders per query
+            start_date:     query start date of the orders
+            end_date:       query end date of the orders
         '''
-        df_orders = super().get_all_orders(query_all=query_all, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
+        df_orders = super().get_all_orders(trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
                 
         # some manual adjusting on orders id
         df_orders['clientOrderId'] = np.where(df_orders['orderId'] == 249865056, 'grid_SOLFDUSDv1_gridid4_MD_close', df_orders['clientOrderId'])

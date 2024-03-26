@@ -38,7 +38,7 @@ class GridPerformance(StrategyPerformance):
         start_date = df['Date'].min()
         end_date = df['Date'].max() + timedelta(minutes=self.interval_min)
 
-        df_orders = self.get_all_orders(query_all=True, trade_details=True, start_date=start_date, end_date=end_date)
+        df_orders = self.get_all_orders(trade_details=True, start_date=start_date, end_date=end_date)
         df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
         df_orders = df_orders[df_orders['updateTime'] >= start_date]
         df_orders = df_orders[df_orders['updateTime'] <= end_date]        

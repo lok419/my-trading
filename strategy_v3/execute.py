@@ -15,5 +15,5 @@ if __name__ == '__main__':
     strategy = StrategyFactory().get(strategy_id)    
     strategy.set_data_loder(DataLoaderBinance())
     strategy.set_executor(ExecutorBinance())
-    strategy.set_strategy_id(strategy_id)    
+    strategy.set_strategy_id(strategy_id, reload=True)    
     strategy.run()        
