@@ -8,7 +8,7 @@ from strategy_v3.DataLoader import DataLoaderBinance
 from strategy_v3.Executor import ExecutorBinance
 from tabulate import tabulate
 from utils.logging import get_logger
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import json
 import warnings
@@ -39,10 +39,19 @@ def time_str(time: str) -> str:
     '''
     if time == 'LTD':
         time = ''
-    if time == 'Today':
+
+    elif time == 'Today':
         date = datetime.today()
         date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
-        date = date.astimezone(ZoneInfo("UTC"))
+        date = date.astimezone(ZoneInfo("UTC"))                   
+        time = date.strftime('%Y-%m-%d %H:%M:%S')
+
+    elif time.endswith('Days Ago') or time.endswith('Day Ago'):
+        date = datetime.today()
+        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
+        date = date.astimezone(ZoneInfo("UTC"))        
+        days = int(time.split(' ')[0])
+        date = date - timedelta(days=days)                    
         time = date.strftime('%Y-%m-%d %H:%M:%S')
     
     return time
@@ -115,7 +124,7 @@ async def action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton(text='Stop', callback_data=f'/update {s} status STOP'),        
     ])
 
-    times = ['Today', '2 Hours Ago', '4 Hours Ago', '12 Hours Ago', '1 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago', 'LTD']
+    times = ['Today', '1 Day Ago', '2 Days Ago', '3 Days Ago', '5 Days Ago', '10 Days Ago', '30 Days Ago', 'LTD']
     for t in times:
         button_list.append([InlineKeyboardButton(text=t, callback_data='/')])
         button_list.append([
