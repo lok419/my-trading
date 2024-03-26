@@ -35,7 +35,7 @@ class StrategyBase(StrategyModel):
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
-            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. By default, the time is based on GMT+8 and converted to UTC
+            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
         '''
         self.instrument = instrument
@@ -43,9 +43,11 @@ class StrategyBase(StrategyModel):
         self.refresh_interval = refresh_interval       
         self.qty_decimal = qty_decimal
         self.price_decimal = price_decimal   
-        self.start_date = start_date             
-        self.period_start = self.get_current_time().floor('1d')
+        self.start_date = start_date        
 
+        self.timezone = ZoneInfo('HongKong')
+        self.period_start = self.get_current_time().floor('1d')
+        
         self.executor = None
         self.data_loader = None
 
@@ -86,10 +88,10 @@ class StrategyBase(StrategyModel):
     @start_date.setter
     def start_date(self, start_date: str|datetime):
         if type(start_date) is datetime:
-            self._start_date = start_date.astimezone(tz=ZoneInfo('HongKong'))
+            self._start_date = start_date.astimezone(tz=self.timezone)
         else:
             try:
-                self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S').astimezone(tz=ZoneInfo('HongKong')) 
+                self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S').astimezone(tz=self.timezone) 
             except:            
                 self._start_date = None                    
 
@@ -126,11 +128,11 @@ class StrategyBase(StrategyModel):
         return type(self.executor) is ExecutorBacktest
     
     def get_current_time(self) -> datetime:
-        return pd.to_datetime(datetime.now(tz=ZoneInfo("HongKong")))
+        return pd.to_datetime(datetime.now(tz=self.timezone))
 
     def load_data(self, lookback:str|datetime, lookback_end:str|datetime=None) -> DataFrame:
         if lookback is None or lookback == '':
-            lookback = self.start_date.strftime('%Y-%m-%d %H:%M:%S')
+            lookback = self.start_date.strftime('%Y-%m-%d %H:%M:%S%z')
 
         df = self.data_loader.load_price_data(self.instrument, self.interval, lookback, lookback_end=lookback_end)
         self.df = df
@@ -230,7 +232,7 @@ class StrategyBase(StrategyModel):
             end_date:       query end date of the orders
         '''
         start_date = start_date if start_date is not None else self.period_start
-        end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=ZoneInfo("HongKong"))
+        end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=self.timezone)
         
         df_orders = self.executor.get_all_orders(self.instrument, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]

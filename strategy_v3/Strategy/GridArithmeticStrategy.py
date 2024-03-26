@@ -41,7 +41,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
-            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. By default, the time is based on GMT+8 and converted to UTC
+            start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
         '''
         super().__init__(

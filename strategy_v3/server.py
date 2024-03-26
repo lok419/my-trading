@@ -42,17 +42,15 @@ def time_str(time: str) -> str:
 
     elif time == 'Today':
         date = datetime.today()
-        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
-        date = date.astimezone(ZoneInfo("UTC"))                   
-        time = date.strftime('%Y-%m-%d %H:%M:%S')
+        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))                         
+        time = date.strftime('%Y-%m-%d %H:%M:%S%z')
 
     elif time.endswith('Days Ago') or time.endswith('Day Ago'):
         date = datetime.today()
-        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
-        date = date.astimezone(ZoneInfo("UTC"))        
+        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))        
         days = int(time.split(' ')[0])
         date = date - timedelta(days=days)                    
-        time = date.strftime('%Y-%m-%d %H:%M:%S')
+        time = date.strftime('%Y-%m-%d %H:%M:%S%z')
     
     return time
 
