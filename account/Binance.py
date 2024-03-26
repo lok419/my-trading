@@ -164,8 +164,8 @@ class Binance(AccountModel):
             trade_details:  true to add more trade details (filled px, commission.....)
 
             Binance API returns max orders of 1000, in order to query all orders, we need to query by batch
-        '''
-        if query_all:
+        '''        
+        if query_all:            
             orders = []        
             start_date_ts = int(datetime.timestamp(start_date)) * 1000
             end_date_ts = int(datetime.timestamp(end_date)) * 1000
@@ -205,6 +205,8 @@ class Binance(AccountModel):
         orders['updateTime'] = orders['updateTime'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
         orders['time'] = orders['time'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
         orders['workingTime'] = orders['workingTime'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
+        orders = orders[orders['time'] >= start_date]
+        orders = orders[orders['time'] <= end_date]
 
         if trade_details:
             '''

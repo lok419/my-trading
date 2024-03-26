@@ -43,7 +43,8 @@ class StrategyBase(StrategyModel):
         self.refresh_interval = refresh_interval       
         self.qty_decimal = qty_decimal
         self.price_decimal = price_decimal   
-        self.start_date = start_date     
+        self.start_date = start_date             
+        self.period_start = self.get_current_time().floor('1d')
 
         self.executor = None
         self.data_loader = None
@@ -168,11 +169,8 @@ class StrategyBase(StrategyModel):
             price: only for backtest, MARKET ORDER does not need price
             date:  only used for backtest
             force: force to close out entire position (usually done manually)
-        '''        
-        all_orders = self.get_all_orders(query_all=True)    
-        filled = all_orders[all_orders['status'] == 'FILLED']
-        filled_net_qty = filled['NetExecutedQty'].sum()   
-        filled_net_qty = round(filled_net_qty, self.qty_decimal)        
+        '''
+        filled_net_qty = self.get_current_position()
 
         if abs(filled_net_qty) > 0:
             self.logger.info('closing out net position of {} {}....'.format(filled_net_qty, self.instrument))
@@ -232,8 +230,8 @@ class StrategyBase(StrategyModel):
             trade_details:  True if we want to add trade details (e.g. fill price, commission etc....)
             limit:          orders to retrieve
         '''
-        start_date = start_date if start_date is not None else self.start_date   
-        end_date = end_date if end_date is not None else datetime(2100,1,1)
+        start_date = start_date if start_date is not None else self.period_start
+        end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=ZoneInfo("HongKong"))
         
         df_orders = self.executor.get_all_orders(self.instrument, query_all=query_all, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
         df_orders = df_orders[df_orders['clientOrderId'].str.startswith(self.__str__())]
@@ -278,6 +276,15 @@ class StrategyBase(StrategyModel):
 
         if since_last >= interval:
             raise CustomException(f'data last updated time is more than {interval}')
+        
+    def is_close_period(self):
+        '''
+            Strategy close period            
+            Every night 23:55 - 00:05, we close out all positions and the pnl/orders for next day will be referenced to this.
+            Because of the number of orders, sometime it is confused when we reference to an time where the market making is in process, and the pnl/orders wil be mess-up
+        '''
+        time = self.get_current_time()
+        return (time.hour == 23 and time.minute >= 55) or (time.hour == 0 and time.minute <= 5)
 
     def run(self, lookback:str):
         '''
@@ -285,7 +292,7 @@ class StrategyBase(StrategyModel):
         '''
         try:
             while True:    
-                try:                
+                try:                    
                     self.update_strategy_params()
                     self.load_data(lookback)                
 
@@ -293,7 +300,13 @@ class StrategyBase(StrategyModel):
                     data = self.df.iloc[-1]                
                     self.sanity_check_data(df, data)
 
-                    self.execute(data)    
+                    if self.is_close_period():
+                        self.logger.info('strategy close period......')
+                        self.cancel_all_orders(silence=True)
+                        self.close_out_positions()
+                    else:
+                        self.execute(data)    
+
                     sleep(self.refresh_interval)
 
                 except Timeout as e:
