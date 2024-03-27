@@ -107,8 +107,9 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 e.g. latest close can be close since last 1s, 30s, 1m, 5m (assume interval is 5m)
         '''
 
-        df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)        
+        df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)                
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
+        df['close_chg'] = df['Close'].diff().shift(1)
 
         df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(1)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
@@ -118,9 +119,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         df['tr'] = np.maximum(df['High'] - df['Low'], np.abs(df['High'] - df['Close'].shift(1)), np.abs(df['Low'] - df['Close'].shift(1)))
         df['atr'] = df['tr'].rolling(self.vol_lookback).mean().shift(1)
 
-        df[['Close_t5', 'Low_t5', 'High_t5']] = df[['Close', 'Low', 'High']].shift(5)
-        df[['Close_t10', 'Low_t10', 'High_t10']] = df[['Close', 'Low', 'High']].shift(10)
-        df[['Close_t20', 'Low_t20', 'High_t20']] = df[['Close', 'Low', 'High']].shift(20)                     
+        df[['Close_t3', 'Low_t3', 'High_t3']] = df[['Close', 'Low', 'High']].shift(3)
+        df[['Close_t6', 'Low_t6', 'High_t6']] = df[['Close', 'Low', 'High']].shift(6)                
 
         # compute rolling metrics based on time-series half-life
         std_hl = []
@@ -145,7 +145,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             std_hl.append(std)
 
         df['close_sma_hl'] = close_hl             
-        df['close_std_hl'] = std_hl        
+        df['close_std_hl'] = std_hl     
 
         self.df = df    
 
@@ -353,19 +353,23 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
         current_px = data['Open'] if self.is_backtest() else data['Close']                
         close_sma = data['close_sma']
+        close_chg = data['close_chg']
         current_vol = data['atr']      
         center_px = stoploss = grid_type = None
-        
-        #if ts_prop == TS_PROP.MEAN_REVERT:            
-            # make sure the current price are same as moving average
-        if current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale:
-            center_px = current_px
-            stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
-            grid_type = GRID_TYPE.MEAN_REVERT
 
-        #elif ts_prop == TS_PROP.MOMENTUM:    
-        # conservative approach on momentum filters
-        elif current_px > close_sma and current_px > data['High_t5'] and data['Low_t5'] > data['High_t10']:                            
+        # sudden surge momentum and this might last for few intervals
+        momentum_up1 = abs(close_chg) > current_vol * 2.5 and close_chg > 0
+        momentum_dw1 = abs(close_chg) > current_vol * 2.5 and close_chg < 0
+
+        # medium term momentum
+        momentum_up2 = current_px > close_sma and current_px > data['High_t3'] and data['Low_t3'] > data['High_t6']
+        momentum_dw2 = current_px < close_sma and current_px < data['Low_t3'] and data['High_t3'] < data['Low_t6']
+
+        # mean revert - current price are same as moving average
+        mean_revert = current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale        
+        
+        # Momentum Up
+        if momentum_up1 or momentum_up2:
             '''
                 Momentum Up Order
                     Upper Bound = same as mean revert. vol_grid_scale references to center price
@@ -380,7 +384,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             )                
             grid_type = GRID_TYPE.MOMENTUM_UP                
 
-        elif current_px < close_sma and current_px < data['Low_t5'] and data['High_t5'] < data['Low_t10']:
+        # Momentum Down
+        elif momentum_dw1 or momentum_dw2:
             '''
                 Momentum Down Order
                     Upper Bound = need to make sure it won't trigger immediately. reference to                         
@@ -394,6 +399,12 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 current_px + self.vol_stoploss_scale * current_vol * self.vol_grid_scale
             )
             grid_type = GRID_TYPE.MOMENTUM_DOWN
+        
+        # Mean Revert
+        elif mean_revert:
+            center_px = current_px
+            stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
+            grid_type = GRID_TYPE.MEAN_REVERT
 
         return center_px, stoploss, grid_type
 
