@@ -42,10 +42,10 @@ class StrategyBase(StrategyModel):
         self.interval = interval       
         self.refresh_interval = refresh_interval       
         self.qty_decimal = qty_decimal
-        self.price_decimal = price_decimal   
-        self.start_date = start_date        
+        self.price_decimal = price_decimal  
 
         self.timezone = ZoneInfo('HongKong')
+        self.start_date = start_date                
         self.period_start = self.get_current_time().floor('1d')
         
         self.executor = None
@@ -92,7 +92,7 @@ class StrategyBase(StrategyModel):
         else:
             try:
                 self._start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S').astimezone(tz=self.timezone) 
-            except:            
+            except Exception as e:                            
                 self._start_date = None                    
 
     def set_executor(self, executor:ExecutorModel):

@@ -335,7 +335,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 stopPrice=None,
             )
         else:
-            self.logger.info('nothing to close out because of no oustanding positions....'.format(date.strftime('%Y-%m-%d %H:%M:%S')))
+            self.logger.info('nothing to close out because of no oustanding positions....')
 
     def derive_grid_center_px(
             self,

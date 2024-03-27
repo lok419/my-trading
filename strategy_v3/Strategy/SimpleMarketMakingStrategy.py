@@ -102,7 +102,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         ts_prop = self.get_ts_prop(data)        
         
         if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN:
-            self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal)))
+            self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal)))
             self.cancel_all_orders(limit=50, silence=True)            
             if round(abs(current_position), self.qty_decimal) != 0:                                
                 self.close_out_positions()        
