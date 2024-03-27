@@ -75,7 +75,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
 
-    def set_strategy_id(self, id:str, reload: bool = True):
+    def set_strategy_id(self, id:str, reload: bool = False):
         '''
             Set strategy id. this is used to identify the orders from same strategy instance
             id:     The strategy name
