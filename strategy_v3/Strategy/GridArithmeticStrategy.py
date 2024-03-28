@@ -75,16 +75,24 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     def __str__(self):
         return 'grid_{}'.format(self.strategy_id)
 
-    def set_strategy_id(self, id:str, reload: bool = False):
+    def set_strategy_id(self, 
+                        strategy_id: str, 
+                        reload: bool = False, 
+                        force_reload_all: bool = False):
         '''
             Set strategy id. this is used to identify the orders from same strategy instance
-            id:     The strategy name
-            reload: True to reload all previous property (e.g. grid_id, grid_type) from latest
+            strategy_id:        The strategy name
+            reload:             True to reload all previous property (e.g. grid_id, grid_type) by querying orders before last closing periods
+            force_reload_all:   True to reload all previous property (e.g. grid_id, grid_type) by quering LTD orders
         '''
-        super().set_strategy_id(id)
+        super().set_strategy_id(strategy_id)
 
         if reload and not self.is_backtest():
-            df_orders = self.get_all_orders(start_date=self.start_date)
+            if force_reload_all:
+                df_orders = self.get_all_orders(start_date=self.start_date)
+            else:
+                df_orders = self.get_all_orders()
+
             if len(df_orders) > 0:
                 grid_type = df_orders.iloc[-1]['grid_type']
                 grid_id = df_orders.iloc[-1]['grid_id']

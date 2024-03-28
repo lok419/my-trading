@@ -113,16 +113,15 @@ class StrategyBase(StrategyModel):
         self.data_loader = data_loader
 
     def set_strategy_id(self, 
-                        id:str,                        
+                        strategy_id :str,                        
                         ):
         '''
             Set strategy id. this is used to identify the orders from same strategy instance
-
-            id:     The strategy name            
+            strategy_id: The strategy name            
         '''
-        self.strategy_id = id
+        self.strategy_id = strategy_id
         self.logger.name = self.__str__()                      
-        self.log_path = os.path.dirname(__file__) + f'/log/{id}.h5'  
+        self.log_path = os.path.dirname(__file__) + f'/log/{strategy_id}.h5'  
 
     def is_backtest(self):
         return type(self.executor) is ExecutorBacktest
