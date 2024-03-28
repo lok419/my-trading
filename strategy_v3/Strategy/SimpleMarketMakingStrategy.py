@@ -17,7 +17,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                  refresh_interval: int = 60,
                  vol_lookback: int = 20,    
                  gamma: float = 0.4,                 
-                 spread_adv_factor: float = 0.01,
+                 spread_flow_factor: float = 0.1,
                  target_position: float = 0,                
                  position_size: float = 50,
                  hurst_exp_mr_threshold: float = 0.5,                 
@@ -56,7 +56,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
 
         self.vol_lookback = vol_lookback
         self.gamma = gamma              
-        self.spread_adv_factor = spread_adv_factor
+        self.spread_flow_factor = spread_flow_factor
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
         self.target_position = target_position
@@ -110,7 +110,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         
         df_bid, df_ask = self.get_order_book(limit=5000)    
         df_trades_bid, df_trades_ask = self.get_aggregate_trades(start_date=f'{self.refresh_interval} seconds ago')
-        r, spread, order_bid, order_ask, mkt_sprd, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2 = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)                
+        r, spread, order_bid, order_ask, mkt_sprd, best_bid, best_ask, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2 = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)                
 
         self.cancel_all_orders(limit=50, silence=True)
         self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, skew: {}, ar_skew: {}, r: {}, spread: {}, vol: {}, adv: {}'.format(
@@ -137,9 +137,11 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             'reservation_price': r,
             'mid_price': mid_px,
             'market_spread': mkt_sprd,
+            'best_bid': best_bid,
+            'best_ask': best_ask,
             'vwmp': vwmp,
             'skew': vwmp - mid_px,
-            'skew_2': vwmp2 - mid_px,
+            'skew_2': vwmp2 - mid_px,            
             'spread': spread,
             'order_bid': order_bid,
             'order_ask': order_ask,
@@ -174,20 +176,21 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 - Basically this is the spreads expected to capture x% of ADV                
         '''
         
-        flow_target = adv * self.spread_adv_factor
-
-        spread_ask = df_ask[df_ask['quantity_cum'] > flow_target/2]['price'].min()
-        spread_bid = df_bid[df_bid['quantity_cum'] > flow_target/2]['price'].max()        
-        spread = spread_ask - spread_bid 
-
+        # flow_target = adv * self.spread_flow_factor
+        # spread_ask = df_ask[df_ask['quantity_cum'] > flow_target/2]['price'].min()
+        # spread_bid = df_bid[df_bid['quantity_cum'] > flow_target/2]['price'].max()        
+        # spread2 = spread_ask - spread_bid
+        
         best_bid = df_bid.iloc[0]['price']
-        best_ask = df_ask.iloc[0]['price']
+        best_ask = df_ask.iloc[0]['price']        
         mid_px = (best_ask + best_bid)/2
         mkt_sprd = best_ask - best_bid
 
         # MO arrival rate
-        ar_bid = df_trades_bid['quantity'].sum()/self.refresh_interval
-        ar_ask = df_trades_ask['quantity'].sum()/self.refresh_interval
+        bid_interval = (df_trades_bid['time'].max() - df_trades_bid['time'].min()).seconds
+        ask_interval = (df_trades_ask['time'].max() - df_trades_ask['time'].min()).seconds
+        ar_bid = df_trades_bid['quantity'].sum()/bid_interval
+        ar_ask = df_trades_ask['quantity'].sum()/ask_interval
         ar_skew = ar_ask - ar_bid
 
         # just for reference
@@ -199,19 +202,22 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         vwmp2 = mid_px + vwmp_skew
 
         # MO arrival to LOB
-        ar_bid_total = ar_bid * self.refresh_interval
-        ar_ask_total = ar_ask * self.refresh_interval
-        bid_chg = df_bid[df_bid['quantity_cum'] > abs(ar_bid_total)].iloc[0]['price'] - best_bid
-        ask_chg = df_ask[df_ask['quantity_cum'] > abs(ar_ask_total)].iloc[0]['price'] - best_ask        
+        ar_bid_next = ar_bid * self.refresh_interval
+        ar_ask_next = ar_ask * self.refresh_interval
+        bid_chg = df_bid[df_bid['quantity_cum'] > abs(ar_bid_next)].iloc[0]['price'] - best_bid
+        ask_chg = df_ask[df_ask['quantity_cum'] > abs(ar_ask_next)].iloc[0]['price'] - best_ask        
         vwmp_skew = ask_chg + bid_chg        
         vwmp = mid_px + vwmp_skew
+
+        # Target Spread
+        spread = (mkt_sprd + ask_chg - bid_chg) * self.spread_flow_factor
 
         r = vwmp - (current - self.target_position) * self.gamma * vol ** 2
         order_bid = min(r - spread/2, best_bid)
         order_ask = max(r + spread/2, best_ask)
         spread = order_ask - order_bid
 
-        return r, spread, order_bid, order_ask, mkt_sprd, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2
+        return r, spread, order_bid, order_ask, mkt_sprd, best_bid, best_ask, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2
 
     def place_bid_ask_order(self, 
                             bids: list[float], 
@@ -329,7 +335,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             log['interval'] = self.interval
             log['refresh_interval'] = self.refresh_interval
             log['gamma'] = self.gamma
-            log['spread_adv_factor'] = self.spread_adv_factor
+            log['spread_flow_factor'] = self.spread_flow_factor
             log['target_position'] = self.target_position
             log['position_size'] = self.position_size
             log['hurst_exp_mo_threshold'] = self.hurst_exp_mo_threshold
