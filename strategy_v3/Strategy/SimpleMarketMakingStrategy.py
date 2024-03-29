@@ -18,6 +18,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                  vol_lookback: int = 20,    
                  gamma: float = 0.4,                 
                  spread_flow_factor: float = 0.1,
+                 px_skew_flow_factor: float = 1,
                  target_position: float = 0,                
                  position_size: float = 50,
                  hurst_exp_mr_threshold: float = 0.5,                 
@@ -33,6 +34,8 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             interval:               time interval to trade            
             refresh_interval:       frequency of function execute() is called (in mintues)
             gamma:                  inventory risk aversion factor
+            spread_flow_factor:     This determines the spread based on market order flow.
+            px_skew_flow_factor:    This determines the mid-price skewness based on market order flow.            
             target_position:        target position to keep during market making (e.g. if i have directional views, i want to have target position)
             position_size:          position size of each limit order
             hurst_exp_mr_threshold: Hurst Exponent Ratio threshold for mean reverting
@@ -57,6 +60,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         self.vol_lookback = vol_lookback
         self.gamma = gamma              
         self.spread_flow_factor = spread_flow_factor
+        self.px_skew_flow_factor = px_skew_flow_factor
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
         self.target_position = target_position
@@ -216,7 +220,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         ar_ask_next = ar_ask * self.refresh_interval
         bid_chg = df_bid[df_bid['quantity_cum'] > abs(ar_bid_next)].iloc[0]['price'] - best_bid
         ask_chg = df_ask[df_ask['quantity_cum'] > abs(ar_ask_next)].iloc[0]['price'] - best_ask        
-        vwmp_skew = ask_chg + bid_chg        
+        vwmp_skew = (ask_chg + bid_chg) * self.px_skew_flow_factor
         vwmp = mid_px + vwmp_skew
 
         # Target Spread
@@ -346,6 +350,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             log['refresh_interval'] = self.refresh_interval
             log['gamma'] = self.gamma
             log['spread_flow_factor'] = self.spread_flow_factor
+            log['px_skew_flow_factor'] = self.px_skew_flow_factor
             log['target_position'] = self.target_position
             log['position_size'] = self.position_size
             log['hurst_exp_mo_threshold'] = self.hurst_exp_mo_threshold
