@@ -102,7 +102,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             Execute function which is called repeatedly for each tick
         '''
         date = data['Date']
-        vol = data['atr']      
+        vol = data['close_std']      
         adv = data['adv']
         hurst_exponent = data['hurst_exponent']
 
@@ -121,12 +121,13 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         r, spread, order_bid, order_ask, mkt_sprd, best_bid, best_ask, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2 = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)                
 
         self.cancel_all_orders(limit=50, silence=True)
-        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, skew: {}, ar_skew: {}, r: {}, spread: {}, vol: {}, adv: {}'.format(
+        self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}, mid: {}, vwmp: {}, skew: {}, skew_inv: {}, ar_skew: {}, r: {}, spread: {}, vol: {}, adv: {}'.format(
             self.status.name, ts_prop.name, hurst_exponent, 
             round(current_position, self.qty_decimal), 
             round(mid_px, self.price_decimal), 
             round(vwmp, self.price_decimal), 
             round(vwmp - mid_px, self.price_decimal), 
+            round(r - vwmp, self.price_decimal), 
             round(ar_skew, self.qty_decimal),
             round(r, self.price_decimal), 
             round(spread, self.price_decimal),
@@ -148,8 +149,9 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             'best_bid': best_bid,
             'best_ask': best_ask,
             'vwmp': vwmp,
-            'skew': vwmp - mid_px,
+            'skew': vwmp - mid_px,            
             'skew_2': vwmp2 - mid_px,            
+            'skew_inv': r - vwmp,
             'spread': spread,
             'order_bid': order_bid,
             'order_ask': order_ask,

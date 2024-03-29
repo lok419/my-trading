@@ -333,8 +333,16 @@ class StrategyBase(StrategyModel):
                         self.logger.error('handled explicitly. retring....')
                         sleep(30)
                     else:
-                        raise(e)                      
-                                                                                              
+                        raise(e)    
+
+                except IndexError as e:
+                    traceback.print_exception(e)
+                    if 'MarketMakingStrategy' in str(self.__class__):
+                        self.logger.error('handled explicitly. retring....')
+                        sleep(self.refresh_interval)
+                    else:
+                        raise(e)
+                                                                                                                  
                 except CustomException as e:
                     traceback.print_exception(e)
                     self.logger.error(e)    
