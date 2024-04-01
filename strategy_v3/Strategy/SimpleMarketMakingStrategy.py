@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pandas.core.frame import DataFrame
+from strategy_v3 import ExecuteSetup
 from strategy_v3.Strategy import STATUS, StrategyBase
 from strategy_v3.Strategy.Performance import MarketMakingPerformance
 from strategy_v3.Strategy.Constant import TS_PROP
@@ -23,11 +24,14 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                  position_size: float = 50,
                  hurst_exp_mr_threshold: float = 0.5,                 
                  hurst_exp_mo_threshold: float = 0.7,
+                 cb_interval: int = 30,
+                 cb_px_chg_threshold: float = 0.02,
                  price_decimal: int = 2,
                  qty_decimal: int = 5,                             
                  status: str = STATUS.RUN,
                  start_date: str = None,
-                 verbose: bool = True,                 
+                 verbose: bool = True,   
+
         ):
         '''
             instrument:             The instrument to trade
@@ -40,6 +44,8 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             position_size:          position size of each limit order
             hurst_exp_mr_threshold: Hurst Exponent Ratio threshold for mean reverting
             hurst_exp_mo_threshold: Hurst Exponent Ratio threshold for momentum
+            cb_interval:            Circuit Breaker interval before re-starting the strategy
+            cb_px_chg_threshold:    The price change threshold for trigger the CB
             price_decimal:          rounding decimal of price
             qty_decimal:            rounding decimal of quantity
             status:                 user can set status to control the strategy behavior
@@ -66,6 +72,10 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         self.target_position = target_position
         self.position_size = position_size  
         self.mm_id = 0
+
+        self.cb_interval = cb_interval
+        self.cb_px_chg_threshold = cb_px_chg_threshold
+        self.cb_end_ts = self.get_current_time() - timedelta(minutes=15)
 
     def __str__(self):
         return 'smm_{}'.format(self.strategy_id)
@@ -108,10 +118,12 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         date = data['Date']
         vol = data['close_std']      
         adv = data['adv']
+        chg_pct = data['close_chg_pct']
         hurst_exponent = data['hurst_exponent']
 
         current_position = self.get_current_position()
         ts_prop = self.get_ts_prop(data)        
+        self.cb_check(chg_pct)
         
         if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN:
             self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal)))
@@ -289,6 +301,9 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         df = super().load_data(lookback, lookback_end) 
         df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
+        df['close_chg'] = df['Close'].diff().shift(1)
+        df['close_chg_pct'] = df['Close'].pct_change().shift(1)
+
         df['adv'] = df['Volume'].rolling(self.vol_lookback).mean().shift(1)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
 
@@ -296,6 +311,24 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         df['tr'] = np.maximum(df['High'] - df['Low'], np.abs(df['High'] - df['Close'].shift(1)), np.abs(df['Low'] - df['Close'].shift(1)))
         df['atr'] = df['tr'].rolling(self.vol_lookback).mean().shift(1)
         self.df = df
+
+    def cb_check(self, chg_pct: float):
+        '''
+            Function to determine if trigger the circuit breaker
+            The MM strategy often be destroyed by the adverse market change, we want to freeze the strategy whenever it happens
+        '''
+        ts = self.get_current_time()     
+
+        if abs(chg_pct) > self.cb_px_chg_threshold:
+            self.cb_end_ts = self.get_current_time() + timedelta(minutes=self.cb_interval)            
+            if self.status != STATUS.CIRCUIT_BREAKER:
+                self.prev_status = self.status
+                self.status = STATUS.CIRCUIT_BREAKER
+                ExecuteSetup(self.strategy_id).update("status", STATUS.CIRCUIT_BREAKER.name, type(self))     
+
+        elif ts > self.cb_end_ts and self.status == STATUS.CIRCUIT_BREAKER:
+            self.status = self.prev_status
+            ExecuteSetup(self.strategy_id).update("status", self.status.name, type(self))                  
     
     def get_all_orders(self,                        
                        trade_details: bool = False,     

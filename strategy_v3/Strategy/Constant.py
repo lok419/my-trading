@@ -20,3 +20,4 @@ class STATUS(Enum):
     PAUSE = 1
     TERMINATE = 2
     STOP = 3
+    CIRCUIT_BREAKER = 4
