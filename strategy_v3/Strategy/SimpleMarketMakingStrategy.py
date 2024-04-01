@@ -120,7 +120,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                 self.close_out_positions()        
             return
         
-        df_bid, df_ask = self.get_order_book(limit=5000)    
+        df_bid, df_ask = self.get_order_book(limit=2000)    
         df_trades_bid, df_trades_ask = self.get_aggregate_trades(start_date=f'{self.refresh_interval} seconds ago')
         r, spread, order_bid, order_ask, mkt_sprd, best_bid, best_ask, mid_px, vwmp, ar_bid, ar_ask, ar_skew, vwmp2 = self.derive_bid_ask_order(current_position, df_bid, df_ask, df_trades_bid, df_trades_ask, adv, vol)                
 

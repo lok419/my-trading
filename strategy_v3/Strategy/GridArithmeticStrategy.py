@@ -103,8 +103,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                 if self.grid_id == 0:
                     self.grid_id = grid_id
 
-    def load_data(self, lookback):
-        super().load_data(lookback)        
+    def load_data(self, lookback, lookback_end:str|datetime=None):
+        super().load_data(lookback, lookback_end)        
         df = self.df
         
         '''
