@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pandas.core.frame import DataFrame
-from strategy_v3 import ExecuteSetup
+from strategy_v3.ExecuteSetup import ExecuteSetup
 from strategy_v3.Strategy import STATUS, StrategyBase
 from strategy_v3.Strategy.Performance import MarketMakingPerformance
 from strategy_v3.Strategy.Constant import TS_PROP
@@ -75,7 +75,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
 
         self.cb_interval = cb_interval
         self.cb_px_chg_threshold = cb_px_chg_threshold
-        self.cb_end_ts = self.get_current_time() - timedelta(minutes=15)
+        self.cb_end_ts = self.get_current_time() - timedelta(minutes=15)        
 
     def __str__(self):
         return 'smm_{}'.format(self.strategy_id)
@@ -117,13 +117,12 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         '''
         date = data['Date']
         vol = data['close_std']      
-        adv = data['adv']
-        chg_pct = data['close_chg_pct']
+        adv = data['adv']        
         hurst_exponent = data['hurst_exponent']
 
         current_position = self.get_current_position()
         ts_prop = self.get_ts_prop(data)        
-        self.cb_check(chg_pct)
+        self.cb_check(data)
         
         if ts_prop != TS_PROP.MEAN_REVERT or self.status != STATUS.RUN:
             self.logger.info('status: {}, ts_prop: {}, hurst_exponent: {:.2f}, inv: {}'.format(self.status.name, ts_prop.name, hurst_exponent, round(current_position, self.qty_decimal)))
@@ -302,7 +301,12 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
         df['close_chg'] = df['Close'].diff().shift(1)
-        df['close_chg_pct'] = df['Close'].pct_change().shift(1)
+
+        df['close_chg_pct_t1'] = (df['Close'] / df['Close'].shift(1) - 1).shift(1)
+        df['close_chg_pct_t2'] = (df['Close'] / df['Close'].shift(2) - 1).shift(1)
+        df['close_chg_pct_t3'] = (df['Close'] / df['Close'].shift(3) - 1).shift(1)
+        df['close_chg_pct_t4'] = (df['Close'] / df['Close'].shift(4) - 1).shift(1)
+        df['close_chg_pct_t5'] = (df['Close'] / df['Close'].shift(5) - 1).shift(1)
 
         df['adv'] = df['Volume'].rolling(self.vol_lookback).mean().shift(1)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
@@ -312,14 +316,21 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         df['atr'] = df['tr'].rolling(self.vol_lookback).mean().shift(1)
         self.df = df
 
-    def cb_check(self, chg_pct: float):
+    def cb_check(self, data: dict):
         '''
             Function to determine if trigger the circuit breaker
             The MM strategy often be destroyed by the adverse market change, we want to freeze the strategy whenever it happens
         '''
         ts = self.get_current_time()     
 
-        if abs(chg_pct) > self.cb_px_chg_threshold:
+        chg_t1 = abs(data['close_chg_pct_t1'])
+        chg_t2 = abs(data['close_chg_pct_t2'])
+        chg_t3 = abs(data['close_chg_pct_t3'])
+        chg_t4 = abs(data['close_chg_pct_t4'])
+        chg_t5 = abs(data['close_chg_pct_t5'])
+        chg_max = max(chg_t1, chg_t2, chg_t3, chg_t4, chg_t5)
+
+        if abs(chg_max) > self.cb_px_chg_threshold:
             self.cb_end_ts = self.get_current_time() + timedelta(minutes=self.cb_interval)            
             if self.status != STATUS.CIRCUIT_BREAKER:
                 self.prev_status = self.status
