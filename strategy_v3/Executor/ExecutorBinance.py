@@ -8,11 +8,19 @@ import numpy as np
 class ExecutorBinance(ExecutorModel):
 
     def __init__(self):
-        self.binance = Binance()        
+        self.binance = Binance()
 
     def set_logger(self, logger):
         self.logger = logger
 
+    def init_session(func):
+        def inner(self, *args, **kwargs):            
+            self.__init__()
+            return func(self, *args, **kwargs)     
+           
+        return inner
+
+    @init_session
     def place_order(self,                    
                     instrument:str,
                     side:str,
@@ -23,8 +31,7 @@ class ExecutorBinance(ExecutorModel):
                     stopPrice: float,                    
                     order_id:str,
                     date:datetime,
-                    ):
-        
+                    ):            
         params = dict()
         params['symbol'] = instrument
         params['side'] = side
@@ -56,6 +63,7 @@ class ExecutorBinance(ExecutorModel):
             else:
                 raise(e)            
     
+    @init_session
     def cancel_order(self, 
                      instrument:str, 
                      df_orders:DataFrame):
@@ -70,6 +78,7 @@ class ExecutorBinance(ExecutorModel):
                 else:
                     raise(e)
         
+    @init_session
     def get_all_orders(self, instrument:str, **params):        
         df_orders = self.binance.get_all_orders(instrument, **params)                        
         df_orders['NetExecutedQty'] = np.where(df_orders['side'] == 'BUY', 1, -1) * df_orders['executedQty']
@@ -78,6 +87,7 @@ class ExecutorBinance(ExecutorModel):
     def fill_orders(self, *args, **kwargs):
         pass
 
+    @init_session
     def add_trading_fee(self, instrument:str, df_orders: DataFrame) -> DataFrame:
         '''
             Binance has actual trading fee for all trades, but it is quoted in either cryto or fiat currency which is is hard to interpret in PNL terms.
@@ -95,12 +105,14 @@ class ExecutorBinance(ExecutorModel):
 
         return df_orders
     
+    @init_session
     def get_order_book(self, instrument, limit: float=1000) -> tuple[DataFrame, DataFrame]:
         '''
             Get Live Order book from binance
         '''
         return self.binance.get_order_book(instrument=instrument, limit=limit)
     
+    @init_session
     def get_aggregate_trades(self, instrument, start_date: datetime|str) -> tuple[DataFrame, DataFrame]:
         '''
             Get aggregated trades
