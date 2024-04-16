@@ -95,9 +95,9 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
             if len(df_orders) > 0:
                 grid_type = df_orders.iloc[-1]['grid_type']
-                grid_id = df_orders.iloc[-1]['grid_id']
+                grid_id = df_orders.iloc[-1]['grid_id']                
 
-                if self.grid_type is None:
+                if len(grid_type) and self.grid_type is None:
                     self.grid_type = GRID_TYPE[grid_type]
 
                 if self.grid_id == 0:
