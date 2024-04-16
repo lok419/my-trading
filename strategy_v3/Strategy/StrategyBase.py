@@ -229,7 +229,7 @@ class StrategyBase(StrategyModel):
             start_date:     query start date of the orders
             end_date:       query end date of the orders
         '''
-        start_date = start_date if start_date is not None else self.get_current_time().floor('1d') - timedelta(days=20)
+        start_date = start_date if start_date is not None else self.get_current_time().floor('1d')
         end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=self.timezone)
         
         df_orders = self.executor.get_all_orders(self.instrument, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
