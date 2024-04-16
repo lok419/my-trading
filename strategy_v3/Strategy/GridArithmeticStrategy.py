@@ -327,7 +327,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             if price is not None:
                 price = round(price, self.price_decimal)
 
-            grid_type_char = self.grid_type_to_char[self.grid_type.name]                        
+            grid_type_char = self.grid_type_to_char[self.grid_type.name] if self.grid_type is not None else ''                    
             order_id = f'{self.__str__()}_gridid{self.grid_id}_{grid_type_char}_{type}'
             side = 'BUY' if filled_net_qty < 0 else 'SELL'
             quantity = abs(filled_net_qty)

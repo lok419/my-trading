@@ -37,7 +37,7 @@ class ExecutorBinance(ExecutorModel):
         params['side'] = side
         params['type'] = order_type
         params['newClientOrderId'] = order_id
-        params['quantity'] = np.format_float_positional(quantity)
+        params['quantity'] = np.format_float_positional(quantity, trim='-')
 
         if timeInForce is not None:
             params['timeInForce'] = timeInForce
