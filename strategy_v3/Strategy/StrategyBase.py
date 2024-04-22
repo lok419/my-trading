@@ -210,8 +210,8 @@ class StrategyBase(StrategyModel):
         '''
             Get current net position
         '''
-        all_orders = self.get_all_orders()    
-        filled = all_orders[all_orders['status'] == 'FILLED']
+        all_orders = self.get_all_orders()      
+        filled = all_orders[all_orders['NetExecutedQty'] != 0]              
         filled_net_qty = filled['NetExecutedQty'].sum()   
         filled_net_qty = round(filled_net_qty, self.qty_decimal)
         return filled_net_qty

@@ -4,6 +4,7 @@ from utils.data_helper import title_case
 from datetime import timedelta
 import pandas as pd
 import numpy as np
+from IPython.display import display
 
 '''
     This is an extension class which consolidates all the pnl or performance related functions (e.g. plots, netting pnl)
@@ -19,7 +20,17 @@ class StrategyPerformance(object):
             capital:    capital allocated to the strategy, used to compute the pnl%
         '''           
         orders = orders.copy()
-        orders = orders[orders['status'] == 'FILLED']        
+
+        # orders could be partially filled and cancelled later, so the executedQty could be zero for a cancelled orders.
+        orders = orders[orders['NetExecutedQty'] != 0]                       
+
+        # Some edge cases that there is no order filled price
+        null_orders = orders[orders['fill_price'].isnull()]
+        if len(null_orders):
+            self.logger.error('Below orders are having null fill price, using order limit price instead')                        
+            display(null_orders)
+
+        orders['fill_price'] = orders['fill_price'].fillna(orders['price'])        
         orders = orders.sort_values(['updateTime', 'clientOrderId'])     
 
         # calculate trading fees separately
