@@ -160,7 +160,8 @@ class StrategyBase(StrategyModel):
                             type:str = 'close',
                             price: float = None,
                             order_id: str = None,                         
-                            date:datetime = None,                             
+                            date:datetime = None,      
+                            offset:int = 0,                       
                             ):
         '''
             Generic function to close out all outstanding positions
@@ -168,9 +169,9 @@ class StrategyBase(StrategyModel):
             type:  reason of the close out. Either stoploss or close (end of strategy)
             price: only for backtest, MARKET ORDER does not need price
             date:  only used for backtest
-            force: force to close out entire position (usually done manually)
+            offset: lookback period to derive the outstanding positions to close         
         '''
-        filled_net_qty = self.get_current_position()
+        filled_net_qty = self.get_current_position(offset=offset)
 
         if abs(filled_net_qty) > 0:
             self.logger.info('closing out net position of {} {}....'.format(filled_net_qty, self.instrument))
@@ -206,11 +207,12 @@ class StrategyBase(StrategyModel):
         net_pos = self.get_current_position()
         return abs(net_pos) == 0
     
-    def get_current_position(self) -> float:
+    def get_current_position(self, offset:int=0) -> float:
         '''
-            Get current net position
+            Get current net position            
+            offset: lookback period to derive the outstanding positions
         '''
-        all_orders = self.get_all_orders()      
+        all_orders = self.get_all_orders(offset=offset)      
         filled = all_orders[all_orders['NetExecutedQty'] != 0]              
         filled_net_qty = filled['NetExecutedQty'].sum()   
         filled_net_qty = round(filled_net_qty, self.qty_decimal)
@@ -220,7 +222,8 @@ class StrategyBase(StrategyModel):
                        trade_details: bool = False,     
                        limit: int = 1000,     
                        start_date: datetime = None,
-                       end_date: datetime = None
+                       end_date: datetime = None,
+                       offset: int = 0,
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)            
@@ -228,8 +231,9 @@ class StrategyBase(StrategyModel):
             limit:          number of orders per query
             start_date:     query start date of the orders
             end_date:       query end date of the orders
+            offset:         lookback period to get the orders if start_date is not given
         '''
-        start_date = start_date if start_date is not None else self.get_current_time().floor('1d')
+        start_date = start_date if start_date is not None else self.get_current_time().floor('1d') - timedelta(days=offset)        
         end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=self.timezone)
         
         df_orders = self.executor.get_all_orders(self.instrument, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)

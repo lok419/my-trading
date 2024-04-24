@@ -308,18 +308,19 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     
     def close_out_positions(self,                                                         
                             type:str = 'close',
-                            price: float = None,
-                            date:datetime = None,                            
+                            price:float = None,
+                            date:datetime = None,     
+                            offset:int = 0                       
                             ):
         '''
             Close out all outstanding positions based on Grid orders
 
-            type:  reason of the close out. Either stoploss or close (end of strategy)
-            price: only for backtest, MARKET ORDER does not need price
-            date:  only used for backtest
-            force: force to close out entire position (usually done manually)
+            type:   reason of the close out. Either stoploss or close (end of strategy)
+            price:  only for backtest, MARKET ORDER does not need price
+            date:   only used for backtest            
+            offset: lookback period to derive the outstanding positions to close         
         '''
-        filled_net_qty = self.get_current_position()
+        filled_net_qty = self.get_current_position(offset=offset)
 
         if abs(filled_net_qty) > 0:
             self.logger.info('closing out net position of {} {}....'.format(filled_net_qty, self.instrument))
@@ -485,7 +486,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                        trade_details: bool = False,     
                        limit: int = 1000,  
                        start_date: datetime = None,
-                       end_date: datetime = None,                                       
+                       end_date: datetime = None,    
+                       offset: int = 0,                                   
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)            
@@ -493,8 +495,9 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             limit:          number of orders per query
             start_date:     query start date of the orders
             end_date:       query end date of the orders
+            offset:         lookback period to get the orders if start_date is not given
         '''
-        df_orders = super().get_all_orders(trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
+        df_orders = super().get_all_orders(trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date, offset=offset)
                 
         # some manual adjusting on orders id
         df_orders['clientOrderId'] = np.where(df_orders['orderId'] == 249865056, 'grid_SOLFDUSDv1_gridid4_MD_close', df_orders['clientOrderId'])

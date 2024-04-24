@@ -345,7 +345,8 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                        trade_details: bool = False,     
                        limit: int = 1000,  
                        start_date: datetime = None,
-                       end_date: datetime = None,                             
+                       end_date: datetime = None,    
+                       offset: int = 0,                         
                        ) -> DataFrame:
         '''
             Get all orders created by this object (using __str__ to determine if created by this object)            
@@ -353,9 +354,10 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             limit:          number of orders per query
             start_date:     query start date of the orders
             end_date:       query end date of the orders
+            offset:         lookback period to get the orders if start_date is not given
         '''
         
-        df_orders = super().get_all_orders(trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)   
+        df_orders = super().get_all_orders(trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date, offset=offset)   
 
         # find the grid_id of orders
         df_orders['mm_id'] = df_orders['clientOrderId'].apply(lambda x: int(re.search(r"(?<=id)\d+(?=_)", x)[0]))
@@ -369,17 +371,17 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                             type:str = 'close',
                             price: float = None,
                             date:datetime = None,
-                            force: bool = False
+                            offset: int = 0,                            
                             ):
             '''
                 Close out all outstanding positions based on Grid orders
-                type:  reason of the close out. Either stoploss or close (end of strategy)
-                price: only for backtest, MARKET ORDER does not need price
-                date:  only used for backtest
-                force: force to close out entire position (usually done manually)
+                type:   reason of the close out. Either stoploss or close (end of strategy)
+                price:  only for backtest, MARKET ORDER does not need price
+                date:   only used for backtest
+                offset: lookback period to derive the outstanding positions to close         
             '''
             order_id = order_id = f'{self.__str__()}_id{self.mm_id}_{type}'
-            super().close_out_positions(type=type, price=price, order_id=order_id, date=date)
+            super().close_out_positions(type=type, price=price, order_id=order_id, date=date, offset=offset)
 
     def log_data(self, data: dict = dict()):
         '''
