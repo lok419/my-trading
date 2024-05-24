@@ -1,4 +1,5 @@
 from time import sleep
+from account import Binance
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel
@@ -11,6 +12,7 @@ from requests.exceptions import Timeout, ConnectionError
 from binance.exceptions import BinanceAPIException
 from strategy_v3.Misc import CustomException
 import pandas as pd
+import numpy as np
 import random
 import traceback
 import os
@@ -21,9 +23,7 @@ class StrategyBase(StrategyModel):
     def __init__(self, 
                  instrument:str, 
                  interval:str,        
-                 refresh_interval:int = 60,            
-                 price_decimal: int = 2,
-                 qty_decimal: int = 5,     
+                 refresh_interval:int = 60,                             
                  status: str = STATUS.RUN,
                  start_date: str = None,
                  verbose: bool = True,                        
@@ -31,18 +31,14 @@ class StrategyBase(StrategyModel):
         '''
             instrument:             The instrument to trade
             interval:               time interval to trade            
-            refresh_interval:       frequency of function execute() is called (in mintues)
-            price_decimal:          rounding decimal of price
-            qty_decimal:            rounding decimal of quantity
+            refresh_interval:       frequency of function execute() is called (in mintues)            
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
         '''
         self.instrument = instrument
         self.interval = interval       
-        self.refresh_interval = refresh_interval       
-        self.qty_decimal = qty_decimal
-        self.price_decimal = price_decimal  
+        self.refresh_interval = refresh_interval               
 
         self.timezone = ZoneInfo('HongKong')
         self.start_date = start_date        
@@ -61,7 +57,20 @@ class StrategyBase(StrategyModel):
         # 5m -> 5mins for round function
         self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
         self.interval_min = int(self.interval.replace('m', ''))
-        self.execute_start_time = self.get_current_time()        
+        self.execute_start_time = self.get_current_time()      
+
+        def count_digit(x: str) -> int:
+            return len(np.format_float_positional(float(x), trim='-').split('.')[1])            
+
+        # Get the qty / price rounding of the symbol
+        filters = Binance().client.get_symbol_info(self.instrument)['filters']
+        filter_qty = list(filter(lambda x: x['filterType'] == 'LOT_SIZE', filters))[0]
+        filter_px = list(filter(lambda x: x['filterType'] == 'PRICE_FILTER', filters))[0]                
+        filter_ntl = list(filter(lambda x: x['filterType'] == 'NOTIONAL', filters))[0]
+
+        self.qty_decimal = count_digit(filter_qty['minQty'])
+        self.price_decimal = count_digit(filter_px['minPrice'])        
+        self.ntl_min = float(filter_ntl['minNotional'])                  
 
     def __str__(self):
         return '{}_{}'.format("".join([x for x in self.__class__.__name__ if x.isupper()]), self.strategy_id)
@@ -171,7 +180,7 @@ class StrategyBase(StrategyModel):
             date:  only used for backtest
             offset: lookback period to derive the outstanding positions to close         
         '''
-        filled_net_qty = self.get_current_position(offset=offset)
+        filled_net_qty = self.get_current_position(offset=offset)        
 
         if abs(filled_net_qty) > 0:
             self.logger.info('closing out net position of {} {}....'.format(filled_net_qty, self.instrument))
@@ -336,6 +345,9 @@ class StrategyBase(StrategyModel):
                         self.logger.error('handled explicitly. retring....')
                         sleep(30)
                     elif e.code == -1099:
+                        self.logger.error('handled explicitly. retring....')
+                        sleep(30)
+                    elif e.code == -1013:
                         self.logger.error('handled explicitly. retring....')
                         sleep(30)
                     else:

@@ -9,9 +9,7 @@
         "vol_stoploss_scale": 3,
         "position_size": 500,
         "hurst_exp_mr_threshold": 0.6,
-        "hurst_exp_mo_threshold": 0.7,
-        "price_decimal": 2,
-        "qty_decimal": 5,
+        "hurst_exp_mo_threshold": 0.7,        
         "status": "RUN",
         "start_date": "2024-02-25 00:00:00"
     },
@@ -25,9 +23,7 @@
         "vol_stoploss_scale": 3,
         "position_size": 50,
         "hurst_exp_mr_threshold": 0.6,
-        "hurst_exp_mo_threshold": 0.7,
-        "price_decimal": 2,
-        "qty_decimal": 2,
+        "hurst_exp_mo_threshold": 0.7,        
         "status": "RUN",
         "start_date": "2024-03-01 00:00:00"     
     },
@@ -41,9 +37,7 @@
         "vol_stoploss_scale": 3,
         "position_size": 50,
         "hurst_exp_mr_threshold": 0.6,
-        "hurst_exp_mo_threshold": 0.7,
-        "price_decimal": 2,
-        "qty_decimal": 4,
+        "hurst_exp_mo_threshold": 0.7,        
         "status": "RUN",
         "start_date": "2024-03-03 18:00:00"
     },
@@ -55,9 +49,7 @@
         "gamma": 0.4,                
         "spread": 20,       
         "target_position": 0,                
-        "position_size": 10,
-        "price_decimal": 2,
-        "qty_decimal": 5,                             
+        "position_size": 10,                                 
         "status": "RUN",               
         "start_date": "2024-03-06 12:00:00"
     }

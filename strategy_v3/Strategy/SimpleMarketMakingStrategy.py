@@ -25,9 +25,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                  hurst_exp_mr_threshold: float = 0.5,                 
                  hurst_exp_mo_threshold: float = 0.7,
                  cb_interval: int = 30,
-                 cb_px_chg_threshold: float = 0.02,
-                 price_decimal: int = 2,
-                 qty_decimal: int = 5,                             
+                 cb_px_chg_threshold: float = 0.02,                 
                  status: str = STATUS.RUN,
                  start_date: str = None,
                  verbose: bool = True,   
@@ -45,9 +43,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             hurst_exp_mr_threshold: Hurst Exponent Ratio threshold for mean reverting
             hurst_exp_mo_threshold: Hurst Exponent Ratio threshold for momentum
             cb_interval:            Circuit Breaker interval before re-starting the strategy
-            cb_px_chg_threshold:    The price change threshold for trigger the CB
-            price_decimal:          rounding decimal of price
-            qty_decimal:            rounding decimal of quantity
+            cb_px_chg_threshold:    The price change threshold for trigger the CB            
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
@@ -55,9 +51,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
         super().__init__(
             instrument=instrument,
             interval=interval,   
-            refresh_interval=refresh_interval,         
-            price_decimal=price_decimal,
-            qty_decimal=qty_decimal,
+            refresh_interval=refresh_interval,                     
             status=status,   
             start_date=start_date,         
             verbose=verbose,

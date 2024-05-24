@@ -21,9 +21,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                  vol_stoploss_scale: float = 7,
                  position_size: float = 100,
                  hurst_exp_mr_threshold: float = 0.5,
-                 hurst_exp_mo_threshold: float = float('inf'),
-                 price_decimal: int = 2,
-                 qty_decimal: int = 5,                             
+                 hurst_exp_mo_threshold: float = float('inf'),                 
                  status: str = STATUS.RUN,
                  start_date: str = None,
                  verbose: bool = True,                 
@@ -37,9 +35,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             vol_grid_size:          Grid spacing in terms of historical volatility
             vol_stoploss_scale:     Stoploss distance from edge of the grids in terms of historical volatility
             position_size:          Position for each orders in terms of $USD
-            hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade
-            price_decimal:          rounding decimal of price
-            qty_decimal:            rounding decimal of quantity
+            hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade            
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
@@ -47,9 +43,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         super().__init__(
             instrument=instrument,
             interval=interval,
-            refresh_interval=refresh_interval,
-            price_decimal=price_decimal,
-            qty_decimal=qty_decimal,
+            refresh_interval=refresh_interval,            
             status=status,
             start_date=start_date,
             verbose=verbose,
