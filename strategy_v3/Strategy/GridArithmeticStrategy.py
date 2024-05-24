@@ -365,8 +365,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         momentum_dw1 = abs(close_chg) > current_vol * 1 and close_chg < 0
 
         # medium term momentum
-        momentum_up2 = current_px > close_sma and current_px > data['High_t3'] and data['Low_t3'] > data['High_t6']
-        momentum_dw2 = current_px < close_sma and current_px < data['Low_t3'] and data['High_t3'] < data['Low_t6']
+        momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['High_t3'] and data['Low_t3'] > data['High_t6']
+        momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t3'] and data['High_t3'] < data['Low_t6']
 
         # mean revert - current price are same as moving average
         mean_revert = current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale        
