@@ -111,7 +111,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
         df['close_std'] = df['Close'].rolling(self.vol_lookback).std().shift(1)                
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
-        df['close_chg'] = df['Close'].diff().shift(1)
+        df['close_chg'] = df['Close'].diff().shift(1)        
 
         df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(1)
         df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
@@ -361,8 +361,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         center_px = stoploss = grid_type = None
 
         # sudden surge momentum and this might last for few intervals
-        momentum_up1 = abs(close_chg) > current_vol * 2.5 and close_chg > 0
-        momentum_dw1 = abs(close_chg) > current_vol * 2.5 and close_chg < 0
+        momentum_up1 = abs(close_chg) > current_vol * 1 and close_chg > 0
+        momentum_dw1 = abs(close_chg) > current_vol * 1 and close_chg < 0
 
         # medium term momentum
         momentum_up2 = current_px > close_sma and current_px > data['High_t3'] and data['Low_t3'] > data['High_t6']
