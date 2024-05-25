@@ -128,8 +128,11 @@ class StrategyBase(StrategyModel):
             strategy_id: The strategy name            
         '''
         self.strategy_id = strategy_id
-        self.logger.name = self.__str__()                      
+        self.logger.name = self.__str__()
+
+        # path for logging and pnl records                  
         self.log_path = os.path.dirname(__file__) + f'/log/{strategy_id}.h5'  
+        self.pnl_path = os.path.dirname(__file__) + f'/pnl/{strategy_id}.h5'
 
     def is_backtest(self):
         return type(self.executor) is ExecutorBacktest
@@ -289,14 +292,21 @@ class StrategyBase(StrategyModel):
         if since_last >= interval:
             raise CustomException(f'data last updated time is more than {interval}')
         
-    def is_close_period(self):
+    def is_close_period(self) -> bool:
         '''
             Strategy close period            
             Every night 23:55 - 00:05, we close out all positions and the pnl/orders for next day will be referenced to this.
             Because of the number of orders, sometime it is confused when we reference to an time where the market making is in process, and the pnl/orders wil be mess-up
         '''
         time = self.get_current_time()
-        return (time.hour == 23 and time.minute >= 55) or (time.hour == 0 and time.minute <= 5)
+        return (time.hour == 23 and time.minute >= 55) or (time.hour == 0 and time.minute <= 5)    
+    
+    def should_save_pnl(self) -> bool:
+        '''
+            Within strategy close period, save the pnl of the day
+        '''
+        time = self.get_current_time()
+        return self.is_close_period() and time.hour == 23
 
     def run(self, lookback:str):
         '''
@@ -316,6 +326,11 @@ class StrategyBase(StrategyModel):
                         self.logger.info('strategy close period......')
                         self.cancel_all_orders(silence=True)
                         self.close_out_positions()
+
+                        # save the pnl of the days after closing out all positions
+                        if self.should_save_pnl():
+                            self.save_pnl()
+
                     else:
                         self.execute(data)    
 
@@ -390,6 +405,80 @@ class StrategyBase(StrategyModel):
         '''
         try:
             return pd.read_hdf(self.log_path, key='log', mode='r')
+        except Exception as e:
+            self.logger.error(e)
+            return None
+        
+    def save_pnl_between(self, start_date:datetime, end_date:datetime, overwrite:bool=True):
+        '''
+            Save the pnl over a periods            
+        '''
+        date = start_date
+        while date <= end_date:
+            self.save_pnl(date, overwrite=overwrite)
+            date = date + timedelta(1)
+    
+    def save_pnl(self, date:datetime=None, overwrite:bool=True):    
+        '''
+            Save the daily pnl performance to file
+            date:       date of the performance to save
+            overwrite:  true to overwrite existing saved performance
+        '''
+        if date is None:
+            date = datetime.today()
+            date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
+
+        pnl_df = self.get_pnl()
+        if not overwrite and len(pnl_df[pnl_df['Date'] == date]) > 0:
+            self.logger.info(f"pnl saved on {date.strftime('%Y-%m-%d')}, skipping.")
+            return
+
+        date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
+        date_str = date.strftime('%Y-%m-%d %H:%M:%S%z')
+        date_str_end = (date + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S%z')
+
+        # load the data
+        self.load_data(date_str, lookback_end=date_str_end) 
+
+        # generate summary table  
+        table = self.summary_table(rename=False)
+        pnl = table[[self.__str__()]].T.reset_index()
+        pnl.columns = ['strategy'] + list(table['Measure'])      
+        pnl['Date'] = date
+
+        # add extra information to save
+        info = self.save_pnl_info()
+        for k, v in info.items():
+            pnl[k] = v
+
+        if pnl_df is not None:
+            pnl_df = pnl_df[pnl_df['Date'] != date]
+            pnl_df = pd.concat([pnl_df, pnl])
+        else:
+            pnl_df = pnl
+
+        pnl_df = pnl_df.sort_values(['Date'])
+        pnl_df.to_hdf(self.pnl_path, key='pnl', format='table')
+        self.logger.info(f"saved pnl on {date.strftime('%Y-%m-%d')}.")
+
+    def save_pnl_info(self) -> dict:
+        '''
+            extra information to store when saving pnl
+            e.g. you might want to snap all the hyparameters for the day together with the pnl....
+        '''
+        info = {
+            'instrument': self.instrument,
+            'interval': self.interval,
+            'refresh_interval': self.refresh_interval,
+        }        
+        return info
+
+    def get_pnl(self) -> DataFrame:
+        '''
+            Retrieve time series of the pnl performance
+        ''' 
+        try:
+            return pd.read_hdf(self.pnl_path, key='pnl', mode='r')
         except Exception as e:
             self.logger.error(e)
             return None

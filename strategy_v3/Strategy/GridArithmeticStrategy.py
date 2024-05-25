@@ -32,10 +32,11 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             refresh_interval:       frequency of function execute() is called (in mintues)
             grid_size:              Size of the Grid, this refers to one directional, i.e. if grids size = 5, that means 5 buy ordes + 5 sell orders
             vol_lookback:           Lookback period to determine the historical volatility
-            vol_grid_size:          Grid spacing in terms of historical volatility
+            vol_grid_scale:         Grid spacing in terms of historical volatility
             vol_stoploss_scale:     Stoploss distance from edge of the grids in terms of historical volatility
             position_size:          Position for each orders in terms of $USD
-            hurst_exp_threshold:    Maxmium hurst exponent ratio to put a grid trade            
+            hurst_exp_mr_threshold: exponent ratio threshold for mean reverting
+            hurst_exp_mo_threshold: exponent ratio threshold for momentum
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
@@ -258,9 +259,6 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             Real trading only: We also need to make sure the filter out orders before strategy start-time
         '''
         all_orders = self.get_all_orders() 
-
-        if not self.is_backtest():
-            all_orders = all_orders[all_orders['time'] > self.execute_start_time]
         
         pending = all_orders.copy()
         pending = pending[pending['status'] != 'FILLED']
@@ -279,11 +277,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
             Real trading only: We also need to make sure the filter out orders before strategy start-time
         '''
-        all_orders = self.get_all_orders() 
-
-        if not self.is_backtest():              
-            all_orders = all_orders[all_orders['time'] > self.execute_start_time]
-
+        all_orders = self.get_all_orders()                 
         last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]
 
         pending = last_grid.copy()        
@@ -518,4 +512,19 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             Actual function to exectue the strategy repeatedly
         '''
-        super().run(lookback='12 Hours Ago')        
+        super().run(lookback='12 Hours Ago')       
+
+    def save_pnl_info(self) -> dict:
+        '''
+            extra information to store when saving pnl
+            e.g. you might want to snap all the hyparameters for the day together with the pnl....
+        '''
+        info = super().save_pnl_info()
+        info['grid_size'] = self.grid_size
+        info['vol_lookback'] = self.vol_lookback    
+        info['vol_grid_scale'] = self.vol_grid_scale
+        info['vol_stoploss_scale'] = self.vol_stoploss_scale
+        info['position_size'] = self.position_size
+        info['hurst_exp_mr_threshold'] = self.hurst_exp_mr_threshold
+        info['hurst_exp_mo_threshold'] = self.hurst_exp_mo_threshold
+        return info

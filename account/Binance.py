@@ -174,6 +174,9 @@ class Binance(AccountModel):
             orders_page = self.client.get_all_orders(symbol=instrument, limit=limit, endTime=date_ts)
             self.logger.debug('Fetching {} orders...'.format(len(orders_page)))
 
+            if len(orders_page) == 0:
+                return self.default_orders
+
             min_date_ts = min([o['time'] for o in orders_page])
             orders = orders_page + orders                
 

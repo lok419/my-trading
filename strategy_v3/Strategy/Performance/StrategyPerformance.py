@@ -123,7 +123,12 @@ class StrategyPerformance(object):
     
     def compute_pnl_metrics(self, 
                             df_pnl:DataFrame,
-                            df_orders: DataFrame) -> DataFrame:
+                            df_orders:DataFrame,
+                            rename:bool=True,
+                            ) -> DataFrame:
+        '''
+            Compute pnl metrics after the strategy given series of pnl and orders
+        '''
         
         interval = int(self.interval.replace('m', ''))
 
@@ -149,17 +154,24 @@ class StrategyPerformance(object):
         perf['annualized_volatility'] = ret_std_ann
         perf['annualized_sharpe_ratio'] = sr
         perf['maximum_drawdown'] = maximum_drawdown(ret_ts)
-
-        measures = [title_case(x) for x in list(perf.keys())]
+        
+        measures = [title_case(x) if rename else x for x in list(perf.keys())]        
         perf = pd.DataFrame({'Measure': measures, self.__str__(): list(perf.values())})  
         return perf
     
-    def summary_table(self):
+    def summary_table(self, rename:bool=True) -> DataFrame:
+        '''
+            Generate Sumamry Table of the performance given loaded data 
+            i.e. time horizonal depends on date for load_data()            
+        '''
         df = self.df
-        df_orders = self.get_all_orders(trade_details=True)
+        start_date = df['Date'].min()
+        end_date = df['Date'].max() + timedelta(minutes=self.interval_min)
+
+        df_orders = self.get_all_orders(trade_details=True, start_date=start_date, end_date=end_date)
         df_orders = self.executor.add_trading_fee(self.instrument, df_orders)
         df_orders = df_orders[df_orders['updateTime'] >= df['Date'].min()]
         df_orders = df_orders[df_orders['updateTime'] <= df['Date'].max() + timedelta(minutes=self.interval_min)]        
         df_pnl = self.compute_pnl(df_orders)        
-        df_pnl_metric = self.compute_pnl_metrics(df_pnl, df_orders)
-        return df_pnl_metric
+        df_pnl_metric = self.compute_pnl_metrics(df_pnl, df_orders, rename=rename)
+        return df_pnl_metric     
