@@ -29,7 +29,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
                  status: str = STATUS.RUN,
                  start_date: str = None,
                  verbose: bool = True,   
-
+                 comment: str = '',
         ):
         '''
             instrument:             The instrument to trade
@@ -47,6 +47,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
+            comment:                Comment to save for the daily pnl or logging. This is used to tag what did you do to the model so we can keep track the actions
         '''
         super().__init__(
             instrument=instrument,
@@ -55,6 +56,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             status=status,   
             start_date=start_date,         
             verbose=verbose,
+            comment=comment,
         )    
 
         self.vol_lookback = vol_lookback
@@ -167,7 +169,7 @@ class SimpleMarketMakingStrategy(StrategyBase, MarketMakingPerformance):
             'ar_bid': ar_bid,
             'ar_ask': ar_ask,
             'ar_skew': ar_skew,
-            'comment': 'vwmp by skew in MO arrival rate and apply on LOB to calculate expected change in mid price'
+            'comment': self.comment,
         }
         self.log_data(data)
 

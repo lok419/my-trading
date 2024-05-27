@@ -26,7 +26,8 @@ class StrategyBase(StrategyModel):
                  refresh_interval:int = 60,                             
                  status: str = STATUS.RUN,
                  start_date: str = None,
-                 verbose: bool = True,                        
+                 verbose: bool = True,     
+                 comment: str = ""                   
         ):
         '''
             instrument:             The instrument to trade
@@ -35,13 +36,15 @@ class StrategyBase(StrategyModel):
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
+            comment:                Comment to save for the daily pnl or logging. This is used to tag what did you do to the model so we can keep track the actions
         '''
         self.instrument = instrument
         self.interval = interval       
         self.refresh_interval = refresh_interval               
 
         self.timezone = ZoneInfo('HongKong')
-        self.start_date = start_date        
+        self.start_date = start_date 
+        self.comment = comment   
         
         self.executor = None
         self.data_loader = None
@@ -470,6 +473,7 @@ class StrategyBase(StrategyModel):
             'instrument': self.instrument,
             'interval': self.interval,
             'refresh_interval': self.refresh_interval,
+            'comment': self.comment,
         }        
         return info
 

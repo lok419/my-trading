@@ -24,7 +24,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                  hurst_exp_mo_threshold: float = float('inf'),                 
                  status: str = STATUS.RUN,
                  start_date: str = None,
-                 verbose: bool = True,                 
+                 verbose: bool = True,  
+                 comment: str = "",
         ):
         '''
             instrument:             The instrument to trade
@@ -40,6 +41,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
+            comment:                Comment to save for the daily pnl or logging. This is used to tag what did you do to the model so we can keep track the actions
         '''
         super().__init__(
             instrument=instrument,
@@ -48,6 +50,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             status=status,
             start_date=start_date,
             verbose=verbose,
+            comment=comment
         )        
         
         self.grid_size = grid_size        
@@ -122,7 +125,11 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         df['tr'] = np.maximum(df['High'] - df['Low'], np.abs(df['High'] - df['Close'].shift(1)), np.abs(df['Low'] - df['Close'].shift(1)))
         df['atr'] = df['tr'].rolling(self.vol_lookback).mean().shift(1)
 
+        df[['Close_t1', 'Low_t1', 'High_t1']] = df[['Close', 'Low', 'High']].shift(1)
+        df[['Close_t2', 'Low_t2', 'High_t2']] = df[['Close', 'Low', 'High']].shift(2)        
         df[['Close_t3', 'Low_t3', 'High_t3']] = df[['Close', 'Low', 'High']].shift(3)
+        df[['Close_t4', 'Low_t4', 'High_t4']] = df[['Close', 'Low', 'High']].shift(4)
+        df[['Close_t5', 'Low_t5', 'High_t5']] = df[['Close', 'Low', 'High']].shift(5)
         df[['Close_t6', 'Low_t6', 'High_t6']] = df[['Close', 'Low', 'High']].shift(6)                
 
         # compute rolling metrics based on time-series half-life
@@ -351,16 +358,16 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         current_px = data['Open'] if self.is_backtest() else data['Close']                
         close_sma = data['close_sma']
         close_chg = data['close_chg']
-        current_vol = data['atr']      
+        current_vol = data['atr']  
         center_px = stoploss = grid_type = None
 
         # sudden surge momentum and this might last for few intervals
-        momentum_up1 = abs(close_chg) > current_vol * 1 and close_chg > 0
-        momentum_dw1 = abs(close_chg) > current_vol * 1 and close_chg < 0
+        momentum_up1 = abs(close_chg) > current_vol * 2 and close_chg > 0
+        momentum_dw1 = abs(close_chg) > current_vol * 2 and close_chg < 0
 
         # medium term momentum
-        momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['High_t3'] and data['Low_t3'] > data['High_t6']
-        momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t3'] and data['High_t3'] < data['Low_t6']
+        momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['High_t2'] and data['Low_t2'] > data['High_t4']
+        momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t2'] and data['High_t2'] < data['Low_t4']
 
         # mean revert - current price are same as moving average
         mean_revert = current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale        
