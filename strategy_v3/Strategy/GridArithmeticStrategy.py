@@ -370,10 +370,10 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t2'] and data['High_t2'] < data['Low_t4']
 
         # mean revert - current price are same as moving average
-        mean_revert = current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale        
+        # mean_revert = current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale        
         
         # Momentum Up
-        if momentum_up1 or momentum_up2:
+        if (momentum_up1 or momentum_up2) and ts_prop == TS_PROP.MOMENTUM:
             '''
                 Momentum Up Order
                     Upper Bound = same as mean revert. vol_grid_scale references to center price
@@ -389,7 +389,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             grid_type = GRID_TYPE.MOMENTUM_UP                
 
         # Momentum Down
-        elif momentum_dw1 or momentum_dw2:
+        elif (momentum_dw1 or momentum_dw2) and ts_prop == TS_PROP.MOMENTUM:
             '''
                 Momentum Down Order
                     Upper Bound = need to make sure it won't trigger immediately. reference to                         
@@ -405,7 +405,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             grid_type = GRID_TYPE.MOMENTUM_DOWN
         
         # Mean Revert
-        elif mean_revert:
+        elif ts_prop == TS_PROP.MEAN_REVERT:
             center_px = current_px
             stoploss = (center_px - (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale, center_px + (self.grid_size + self.vol_stoploss_scale) * current_vol * self.vol_grid_scale)
             grid_type = GRID_TYPE.MEAN_REVERT
