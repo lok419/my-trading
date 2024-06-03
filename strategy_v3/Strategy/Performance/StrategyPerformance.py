@@ -139,6 +139,7 @@ class StrategyPerformance(object):
         ret_std = np.std(ret_ts)
 
         pnl = df_pnl['pnl'].sum()
+        pnl_gross = df_pnl['pnl_gross'].sum()
         trading_fee = df_pnl['trading_fee'].sum()        
 
         sr = (ret_mean - rf_)/ret_std * np.sqrt(360*24*60/interval)        
@@ -148,7 +149,8 @@ class StrategyPerformance(object):
 
         perf = {}   
         perf['pnl'] = pnl
-        perf['trading_fee'] = trading_fee           
+        perf['trading_fee'] = -trading_fee   
+        perf['pnl_gross'] = pnl_gross
         perf['cumulative_return'] = ret_cum 
         perf['annualized_return'] = ret_mean_ann
         perf['annualized_volatility'] = ret_std_ann

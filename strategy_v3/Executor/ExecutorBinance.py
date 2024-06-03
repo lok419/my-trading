@@ -96,12 +96,16 @@ class ExecutorBinance(ExecutorModel):
             MAKER - Limit orders, but GTC LIMIT orders can be both MAKER or TAKER, we just assume all MARKER here
             TAKER - Market orders
         '''        
-        fees = self.binance.get_trading_fee(instrument=instrument).iloc[0]
-        marker_fee = fees['makerCommission']
-        taker_fee = fees['takerCommission']
-        df_orders['trading_fee'] = np.where(df_orders['type'].str.contains('LIMIT'), marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['price']
-        df_orders['trading_fee'] = np.where(df_orders['status'] == 'FILLED', df_orders['trading_fee'], 0)
-        df_orders['trading_fee'] = df_orders['trading_fee'].astype(float)
+        #fees = self.binance.get_trading_fee(instrument=instrument).iloc[0]
+        #marker_fee = fees['makerCommission']
+        #taker_fee = fees['takerCommission']
+
+        base_asset = self.binance.client.get_symbol_info(instrument)['baseAsset']         
+        df_orders['trading_fee'] = np.where(df_orders['commissionAsset'] == base_asset, df_orders['commission'] * df_orders['fill_price'], df_orders['commission'])
+
+        #df_orders['trading_fee'] = np.where(df_orders['type'].str.contains('LIMIT'), marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['fill_price']
+        #df_orders['trading_fee'] = np.where(df_orders['status'] == 'FILLED', df_orders['trading_fee'], 0)
+        #df_orders['trading_fee'] = df_orders['trading_fee'].astype(float)
 
         return df_orders
     
