@@ -63,7 +63,10 @@ class StrategyBase(StrategyModel):
         self.execute_start_time = self.get_current_time()      
 
         def count_digit(x: str) -> int:
-            return len(np.format_float_positional(float(x), trim='-').split('.')[1])            
+            try:
+                return len(np.format_float_positional(float(x), trim='-').split('.')[1])            
+            except:
+                return 0       
 
         # Get the qty / price rounding of the symbol
         filters = Binance().client.get_symbol_info(self.instrument)['filters']
@@ -432,7 +435,7 @@ class StrategyBase(StrategyModel):
             date = datetime(year=date.year, month=date.month, day=date.day, tzinfo=ZoneInfo("HongKong"))
 
         pnl_df = self.get_pnl()
-        if not overwrite and len(pnl_df[pnl_df['Date'] == date]) > 0:
+        if not overwrite and pnl_df is not None and len(pnl_df[pnl_df['Date'] == date]) > 0:
             self.logger.info(f"pnl saved on {date.strftime('%Y-%m-%d')}, skipping.")
             return
 
