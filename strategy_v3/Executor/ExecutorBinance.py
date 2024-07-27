@@ -100,7 +100,7 @@ class ExecutorBinance(ExecutorModel):
         #marker_fee = fees['makerCommission']
         #taker_fee = fees['takerCommission']
 
-        base_asset = self.binance.client.get_symbol_info(instrument)['baseAsset']         
+        base_asset = self.binance.client.get_symbol_info(instrument)['baseAsset']
         df_orders['trading_fee'] = np.where(df_orders['commissionAsset'] == base_asset, df_orders['commission'] * df_orders['fill_price'], df_orders['commission'])
 
         #df_orders['trading_fee'] = np.where(df_orders['type'].str.contains('LIMIT'), marker_fee, taker_fee) * df_orders['executedQty'] * df_orders['fill_price']
