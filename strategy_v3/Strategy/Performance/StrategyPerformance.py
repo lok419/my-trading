@@ -35,7 +35,7 @@ class StrategyPerformance(object):
 
         # calculate trading fees separately
         df_fee = orders.copy()        
-        df_fee['Date'] = df_fee['updateTime'].dt.round(self.interval_round)        
+        df_fee['Date'] = df_fee['updateTime'].dt.round(self.interval_round)                
         df_fee = df_fee.groupby(['Date']).sum(numeric_only=True)[['trading_fee']].reset_index()
 
         pnl = []
