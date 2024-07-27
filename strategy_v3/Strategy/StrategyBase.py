@@ -74,8 +74,8 @@ class StrategyBase(StrategyModel):
         filter_px = list(filter(lambda x: x['filterType'] == 'PRICE_FILTER', filters))[0]                
         filter_ntl = list(filter(lambda x: x['filterType'] == 'NOTIONAL', filters))[0]
 
-        self.qty_decimal = count_digit(filter_qty['minQty'])
-        self.price_decimal = count_digit(filter_px['minPrice'])        
+        self.qty_decimal = count_digit(filter_qty['stepSize'])
+        self.price_decimal = count_digit(filter_px['tickSize'])        
         self.ntl_min = float(filter_ntl['minNotional'])                  
 
     def __str__(self):
