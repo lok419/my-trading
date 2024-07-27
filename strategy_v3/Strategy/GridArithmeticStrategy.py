@@ -430,7 +430,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
         grid_type_char = self.grid_type_to_char[grid_type.name]
         grid_scales = list(range(-self.grid_size,self.grid_size+1,1))      
-        grid_space = current_vol * self.vol_grid_scale
+        grid_space = max(current_vol * self.vol_grid_scale, 10**-self.price_decimal)
 
         grid_prices = [center_px + x * grid_space for x in grid_scales]       
         self.grid_id += 1     
