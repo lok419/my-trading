@@ -22,7 +22,8 @@ class Binance(AccountModel):
         self.logger = get_logger('Binance')
 
         # bianance API doesn't return empty dataframe if empty, we need to create our own to avoid any error in stratety
-        self.default_orders = DataFrame(columns=['symbol', 'clientOrderId', 'price', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId'], )        
+        self.default_orders = DataFrame(columns=['symbol', 'clientOrderId', 'price', 'origQty', 'executedQty', 'status', 'side', 'type', 'timeInForce', 'updateTime', 'time', 'orderId', 
+                                                 'fill_price', 'commission', 'commissionAsset', 'isBuyer', 'isMaker', 'isBestMatch', 'qty', 'trade'])
         self.default_orders['updateTime'] = pd.to_datetime(self.default_orders['updateTime'])
         self.default_orders['time'] = pd.to_datetime(self.default_orders['time'])
         self.default_orders ['updateTime'] = self.default_orders['updateTime'].dt.tz_localize('UTC').dt.tz_convert(self.target_tz)
