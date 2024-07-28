@@ -22,14 +22,31 @@ def get_etf_lists_from_etfdb(region=None, asset_class=None, investment_strategy=
     url = 'https://etfdb.com/api/screener/'
 
     payload = {}    
-    payload['asset_class'] = [asset_class] if asset_class else []
-    payload['sectors'] = [sector] if sector else []
-    payload['regions'] = [region] if region else []
-    payload['investment_strategies'] = [investment_strategy] if investment_strategy else []   
-    payload['sizes'] = [size] if size else []
-    payload['commodity_types'] = [commodity_type] if commodity_type else []
-    payload['commodity_exposures'] = [commodity_exposure] if commodity_exposure else []
-    payload['real_estate_sectors'] = [real_estate_sector] if real_estate_sector else []
+
+    if asset_class:
+        payload['asset_class'] = [asset_class]
+    
+    if sector:
+        payload['sectors'] = [sector]
+
+    if region:
+        payload['regions'] = [region]
+
+    if investment_strategy:
+        payload['investment_strategies'] = [investment_strategy]
+
+    if size:
+        payload['sizes'] = [size]
+
+    if commodity_type:
+        payload['commodity_types'] = [commodity_type]
+
+    if commodity_exposure:
+        payload['commodity_exposures'] = [commodity_exposure]
+
+    if real_estate_sector:
+        payload['real_estate_sectors'] = [real_estate_sector]
+
     payload['page'] = 1    
 
     headers = {
@@ -43,9 +60,8 @@ def get_etf_lists_from_etfdb(region=None, asset_class=None, investment_strategy=
 
     payload_dump = json.dumps(payload)
     r = requests.post(url, data=payload_dump, headers=headers)
-    data = json.loads(r.content)
-    
-    pages = data['meta']['total_pages']
+    data = json.loads(r.content)    
+    pages = data['meta']['total_pages']    
     df_etf = []
 
     for page in range(1, pages+1):
@@ -53,7 +69,7 @@ def get_etf_lists_from_etfdb(region=None, asset_class=None, investment_strategy=
             payload['page'] = page
             payload_dump = json.dumps(payload)
             r = requests.post(url, data=payload_dump, headers=headers)
-            data = json.loads(r.content)                    
+            data = json.loads(r.content)                                         
         
         for item in data['data']:    
             row = {}
@@ -71,7 +87,6 @@ def get_etf_lists_from_etfdb(region=None, asset_class=None, investment_strategy=
             row['commodity_type'] = commodity_type
             row['commodity_exposure'] = commodity_exposure
             row['real_estate_sector'] = real_estate_sector
-
             df_etf.append(row)
 
     df_etf = pd.DataFrame(df_etf)
@@ -207,7 +222,6 @@ def get_all_etf():
     file = os.path.dirname(os.path.realpath(__file__)) + "/Data/etf_lists.h5"
     df = pd.read_hdf(file, key='etfdb', mode='r')
     return df
-
     
 
 
