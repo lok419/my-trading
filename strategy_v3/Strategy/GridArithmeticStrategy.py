@@ -197,7 +197,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             When status is RUN, grid status is IDLE and time-series is not random => place grid orders            
         '''
-        if self.status == STATUS.RUN and grid_status == GRID_STATUS.IDLE :#and ts_prop != TS_PROP.RANDOM:          
+        if self.status == STATUS.RUN and grid_status == GRID_STATUS.IDLE:
             center_px, stoploss, grid_type = self.derive_grid_center_px(data, ts_prop)
             current_vol = vol
             current_px = open if self.is_backtest() else close
@@ -223,8 +223,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             Check the close price and determine if we need stop loss        
             for real trading, we don't need a actual price for stoploss
         '''        
-        if grid_status == GRID_STATUS.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1]):                         
-            stop_px = self.stoploss[0] if close < self.stoploss[0] else self.stoploss[1]
+        if grid_status == GRID_STATUS.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1]): 
+            stop_px = close
             stop_px = round(stop_px, self.price_decimal)
             self.logger.info('stop loss are triggered at {}.'.format(stop_px))
             
@@ -366,8 +366,11 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         momentum_dw1 = abs(close_chg) > current_vol * 2 and close_chg < 0
 
         # medium term momentum
-        momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['High_t2'] and data['Low_t2'] > data['High_t4']
-        momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t2'] and data['High_t2'] < data['Low_t4']
+        #momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['High_t2'] and data['Low_t2'] > data['High_t4']
+        #momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t2'] and data['High_t2'] < data['Low_t4']
+
+        momentum_up2 = close_chg < 0 and current_px < close_sma and current_px > data['Close_t2'] and data['Close_t2'] > data['Close_t4']
+        momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Close_t2'] and data['Close_t2'] < data['Close_t4']
 
         # mean revert - current price are same as moving average
         # mean_revert = current_px > close_sma - current_vol * self.vol_grid_scale and current_px < close_sma + current_vol * self.vol_grid_scale        
