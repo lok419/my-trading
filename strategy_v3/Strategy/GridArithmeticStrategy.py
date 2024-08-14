@@ -230,7 +230,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             
             stop_px = stop_px if self.is_backtest() else None            
             self.cancel_all_orders()
-            self.close_out_positions('stoploss', stop_px, date)
+            self.close_out_positions('stl', stop_px, date)
 
         '''
             If status is terminate, cancel all orders and close out the positions
@@ -238,7 +238,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''        
         if self.status == STATUS.TERMINATE:
             self.cancel_all_orders()                        
-            self.close_out_positions('close', None, None)
+            self.close_out_positions('cls', None, None)
             self.status = STATUS.STOP
             ExecuteSetup(self.strategy_id).update("status", STATUS.STOP.name, type(self))
 
@@ -302,7 +302,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         return has_filled and has_pending and abs(filled_net_qty) == 0
     
     def close_out_positions(self,                                                         
-                            type:str = 'close',
+                            type:str = 'cls',
                             price:float = None,
                             date:datetime = None,     
                             offset:int = 0                       
