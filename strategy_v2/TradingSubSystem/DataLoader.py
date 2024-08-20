@@ -1,7 +1,7 @@
 import yfinance
 import pandas as pd
 from utils.data_helper import add_bday
-from utils.data import get_yahoo_data
+from utils.data import get_yahoo_data_formatted
 from functools import cache
 
 class DataLoader(object):
@@ -20,16 +20,4 @@ class DataLoader(object):
         """                
         data_start = add_bday(self.start_date, -self.offset)    
         data_end = self.end_date
-
-        # Bug from yahoo API, it doesn't include price at end_date            
-        px = get_yahoo_data(tickers=tuple(self.instruments), interval="1d",auto_adjust=True, start=data_start, end=add_bday(data_end, 10))
-
-        # make sure we don't change the cache results
-        px = px.copy()
-        
-        # If there is only one instruments, restructure the data to include name in columns
-        if len(self.instruments) == 1:
-            px.columns = pd.MultiIndex.from_product([px.columns, self.instruments])
-
-        px = px[data_start: data_end]
-        self.data['px'] = px
+        self.data['px'] = get_yahoo_data_formatted(self.instruments, data_start, data_end)

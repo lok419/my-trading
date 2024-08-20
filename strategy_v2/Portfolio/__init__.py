@@ -3,6 +3,6 @@ from .PortfolioModel import PortfolioModel
 from .Performance import Performance
 from .PortfolioBase import PortfolioBase
 from .PortfolioStandard import PortfolioStandard
-from .PortfolioLinearOpt import PortfolioLinearOpt
+from .PortfolioMeanVarOpt import PortfolioMeanVarOpt
 from .RebalancerIter import RebalancerIter
 
