@@ -110,7 +110,11 @@ class PortfolioBase(PortfolioModel, Performance):
         for i, system in enumerate(self.systems):        
             system.set_start_date(self.start_date - BDay(self.offset))
             system.set_end_date(self.end_date)
+
+            # generate all positions per strategy
             system.backtest()
+
+            # combine positions from strategy and volatility targeting
             system.optimize()
 
             pos = system.get_position()

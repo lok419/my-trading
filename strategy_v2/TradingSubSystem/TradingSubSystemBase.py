@@ -90,6 +90,7 @@ class TradingSubSystemBase(TradingSubSystemModel, DataLoader):
                 self.position = pd.merge(self.position, pos, how='outer', on=['Date'], validate='1:1')
                 self.ret[str(s)] = ret    
 
+        # position columns here are in strategy - symbol but NOT symbol only
         self.position = self.position.fillna(0)
         self.ret = self.ret.fillna(0) 
 

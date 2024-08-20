@@ -26,13 +26,14 @@ class TradingSubSystemSingle(TradingSubSystemBase):
         '''
 
         # Combine and produce the final weights
+        # combnie_weights() transforms position from (strategy-symbol) to symbol dataframe
         self.combined_position = self.combnie_weights(self.ret, self.position)
         self.combined_ret = self.generate_backtest_return(self.combined_position)
         
         # Scale the position to match the volatility target
         close_px = self.data['px']['Close'].loc[self.combined_position.index]  
 
-        # Be aware i take mean here to convert Dataframe to Series, we SHOULD NOT have more than one instruments              
+        # Be aware I take mean here to convert Dataframe to Series, we SHOULD NOT have more than one instruments              
         close_ret = (close_px / close_px.shift(1) - 1).fillna(0).mean(axis=1)        
 
         self.scale_factor, self.px_vol = self.position_sizing(close_ret, self.vol_target, px_vol_windows=20)
@@ -62,7 +63,7 @@ class TradingSubSystemSingle(TradingSubSystemBase):
                         px_ret: pd.Series, 
                         vol_target: float, 
                         px_vol_windows: float=20,
-        ) -> (pd.Series, float):        
+        ) -> (pd.Series, float):         # type: ignore
         """
             Derive the position sizing based on your volatiltiy target and instrument volatility
             We use Simple volatility for now
