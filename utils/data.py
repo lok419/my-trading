@@ -1,8 +1,10 @@
+from pandas.core.frame import DataFrame
 import pandas as pd
 import yfinance as yf
 import requests
 from functools import cache
 from datetime import datetime
+from utils.data_helper import add_bday
 
 @cache
 def get_sp500_tickers():
@@ -84,3 +86,16 @@ def get_yahoo_data(*args, **kwargs):
         This is a cached wrapper to Yahoo API so that we can cache the data globally
     '''    
     return yf.download(*args, **kwargs)
+
+def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_date: datetime) -> DataFrame:
+
+    # Bug from yahoo API, it doesn't include price at end_date            
+    px = get_yahoo_data(tickers=tuple(instruments), interval="1d",auto_adjust=True, start=start_date, end=add_bday(end_date, 10))
+    px = px.copy()
+
+    # If there is only one instruments, restructure the data to include name in columns
+    if len(instruments) == 1:
+        px.columns = pd.MultiIndex.from_product([px.columns, instruments])
+
+    px = px[start_date: end_date]
+    return px
