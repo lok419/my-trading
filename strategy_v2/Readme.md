@@ -28,7 +28,7 @@
 
 ## Core Strategy
 
-This is a strategy class which defines the position to trade, the class should have below function. <b>Ideally, i want strategy class only deal with strategy logic without any other stuff.</b>
+This is a strategy class which defines the position to trade, the class should have below function. <b>Ideally, I want the core class only deal with strategy logic without any other stuff. All returnability prediction or alpha generation should be done here.</b>
 
 - Type: Algo / Discretionary
 
@@ -63,21 +63,30 @@ This is a strategy class which defines the position to trade, the class should h
 
 - <b>Backtest / performance / GetData / stock universe function are implemented here</b>
 
-- Main implementation is the core logic to combine weights from the different outputs (e.g. could be equal weighted)
+- Main implementation is the core logic to combine weights from the different strategy outputs (e.g. could be equal weighted)
 
     - <b>Volatility targeting</b> - The combined weights should align with your volatility targeting (e.g. risk tolerance),
 
-    - <b>Diversification multiplier</b> - Optionally, we need to scale up the combined weights, as the combined weights tends to make the position smaller than original volatiltiy targeting
+    - <b>Diversification multiplier</b> [<i>NOT IMPLMENTED</i>] - Optionally, we need to scale up the combined weights, as the combined weights tends to make the position smaller than original volatiltiy targeting
     
     - Assume we trade 100% of the capial within this subsystem
 
 ## Portfolios
 
-- Portfolios class allocate captial to different Trading subsystem
+- Portfolios class allocate captial to different Trading subsystem. <b>It is NOT designed to generate alpha, but more to attribute and rebalance among strategies</b>
 
-- It looks at out of sample back-test or realized PL of the subsystem and allocate the captial.
+- It looks at backtest or realized PL of the subsystem and allocate the captial.
 
 - <b>Ideally, I want to follow the MAB algorithm which good strategy will dominate, and bad strategy will be dumpped over time</b>, but we could also use MPT and treat each of the subsystem as "stock" and optimize the weights
+
+- Current available portfolios:
+    - <b>Mean Variance Optimization</b>: It looks at backtest return per strategy and maximize objective function $ret - gamma * risk$ via quadratic programming 
+
+- Other functionaility:
+    - <b>Backtesting</b>: This allows you to backtest the optimized portfolio performance
+    - <b>Rebalance</b>: Class enables users to choose rebalance frequence (in cron). E.g. RebalancerIter('0 0 * * Fri', 2) => Rebalance on Friday every 2 weeks.
+    - <b>Transaction Cost Model</b>: Portfolio can take transaction costs model into account for backtesting. E.g. TransactionCostFutu() which is coded at exact tiered fee from Futu official website
+
 
 ## Executors
 
@@ -90,6 +99,8 @@ This is a strategy class which defines the position to trade, the class should h
     - position inertia - i.e. do not trade the delta in notional is samller than $x
 
 - Different execution channels. (your portfolio could have cryto which should be executed in Binance)
+
+- Supported channels: Futu
 
 ## Notes
 
