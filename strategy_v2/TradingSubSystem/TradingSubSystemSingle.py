@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from pandas.core.api import DataFrame as DataFrame
+from pandas.core.api import DataFrame as DataFrame, Series
 from strategy_v2.TradingSubSystem import TradingSubSystemBase
 from utils.performance import annualized_volatility_ts
 
@@ -22,21 +22,16 @@ class TradingSubSystemSingle(TradingSubSystemBase):
         '''
             Optimize the capital weights among strategy variations
             1. Combine different strategy weights from different strategy
-            2. Scale the combined weights to match your volatility target
+            2.  Scale the combined weights to match your volatility target
+            2a. We use the backtest returns to derive the historical volatility and use that to scale to the volatility target
         '''
 
         # Combine and produce the final weights
         # combnie_weights() transforms position from (strategy-symbol) to symbol dataframe
         self.combined_position = self.combnie_weights(self.ret, self.position)
-        self.combined_ret = self.generate_backtest_return(self.combined_position)
-        
-        # Scale the position to match the volatility target
-        close_px = self.data['px']['Close'].loc[self.combined_position.index]  
+        self.combined_ret = self.generate_backtest_return(self.combined_position)        
 
-        # Be aware I take mean here to convert Dataframe to Series, we SHOULD NOT have more than one instruments              
-        close_ret = (close_px / close_px.shift(1) - 1).fillna(0).mean(axis=1)        
-
-        self.scale_factor, self.px_vol = self.position_sizing(close_ret, self.vol_target, px_vol_windows=20)
+        self.scale_factor, self.px_vol = self.position_sizing(self.combined_ret, self.vol_target, px_vol_windows=20)
         self.scaled_combined_position = np.minimum(self.combined_position.mul(self.scale_factor, axis=0), self.max_leverage)
         self.scaled_combined_ret = self.generate_backtest_return(self.scaled_combined_position)
         self.logger.info('Volatility Target = {:.1f}% | Price Volatility = {:.1f}% | Last Scale Factor = {:.2f}'.format(self.vol_target*100, self.px_vol*100 ,self.scale_factor[-1]))
@@ -63,7 +58,7 @@ class TradingSubSystemSingle(TradingSubSystemBase):
                         px_ret: pd.Series, 
                         vol_target: float, 
                         px_vol_windows: float=20,
-        ) -> (pd.Series, float):         # type: ignore
+        ) -> (Series, float):         # type: ignore
         """
             Derive the position sizing based on your volatiltiy target and instrument volatility
             We use Simple volatility for now
@@ -76,7 +71,7 @@ class TradingSubSystemSingle(TradingSubSystemBase):
     def get_position(self) -> DataFrame:
         return self.scaled_combined_position
     
-    def get_return(self) -> pd.Series:
+    def get_return(self) -> Series:
         return self.scaled_combined_ret
     
 

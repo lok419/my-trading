@@ -6,7 +6,12 @@ import pandas as pd
 class StrategyBase(object):
     def __init__(self):                
         self.data = {}
-        self.position = pd.DataFrame()        
+        self.position = pd.DataFrame()    
+        self.logger = get_logger(self.__class__.__name__)
+
+    def set_instruments(self, instruments:list|str):
+        self.instruments = instruments
+        return self
 
     def set_data(self, data:dict):
         self.data = data
@@ -21,7 +26,13 @@ class StrategyBase(object):
         
     def set_end_date(self, end_date:datetime):
         self.end_date = end_date
-        return self        
+        return self     
+
+    @abstractmethod
+    def load_data(self):
+        '''
+            In case the data wasn't passed or additional data is needed            
+        '''
 
     @abstractmethod
     def preprocess_data(self):

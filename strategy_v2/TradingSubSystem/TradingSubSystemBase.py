@@ -67,13 +67,15 @@ class TradingSubSystemBase(TradingSubSystemModel, DataLoader):
     def backtest(self):
         """
             Backtest all your strategies in the subsystem
+            ******** Backtest here excludes the transaction costs ********
         """
         self.load_data()
         for i, s in enumerate(self.strategy):            
             self.logger.info('Generating position for strategy {} between {} and {}......'.format(str(s), self.start_date.strftime('%Y-%m-%d'), self.end_date.strftime('%Y-%m-%d')))
 
             # set properties to strategy
-            s.set_data(self.data)            
+            s.set_instruments(self.instruments)
+            s.set_data(self.data)                               
             s.set_start_date(self.start_date)
             s.set_end_date(self.end_date)                        
             s.preprocess_data()
