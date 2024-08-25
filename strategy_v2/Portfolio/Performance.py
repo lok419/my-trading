@@ -54,8 +54,8 @@ class Performance(object):
                 'Daily Return (%)',
                 'Volatility - 1m and 3m (%)',
                 'Strategy Weights (%)',
-                'Rebalanced Portfolio Leverage (%)',                
-                'Rebalanced Portfolio Weights (%)',
+                'Rebalanced Portfolio Leverage (%) (excl. MTM)',                
+                'Rebalanced Portfolio Weights (%) (excl. MTM)',
                 'Rebalanced Portfolio Shares',
                 'Rebalanced Portfolio Value',
                 'Instrument Price',
@@ -113,7 +113,7 @@ class Performance(object):
             w = self.port_w[s]            
             fig.add_trace(go.Scatter(x=w.index, y=100*w, name=s, showlegend=not show_all_rets, legendgroup=s, marker=dict(color=c)), row=4, col=1)            
 
-        leverage = self.port_position_rebal.sum(axis=1)        
+        leverage = self.port_position_rebal_strike.sum(axis=1)        
         fig.add_trace(go.Scatter(x=leverage.index, y=leverage*100, showlegend=False, marker=dict(color=colors[0])), row=5, col=1)                
 
         instruments = self.port_position.columns
@@ -122,7 +122,7 @@ class Performance(object):
         for i in instruments:
             c = colors_iter.__next__()        
 
-            pos = self.port_position_rebal[i]
+            pos = self.port_position_rebal_strike[i]
             pos_shs = self.port_position_shs_rebal[i]            
             pos_dp = self.port_position_dp_rebal[i]
             px = self.close_px[i]

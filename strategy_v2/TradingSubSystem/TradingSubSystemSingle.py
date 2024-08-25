@@ -31,7 +31,12 @@ class TradingSubSystemSingle(TradingSubSystemBase):
         self.combined_ret = self.generate_backtest_return(self.combined_position)        
 
         self.scale_factor, self.px_vol = self.position_sizing(self.combined_ret, self.vol_target, px_vol_windows=20)
-        self.scaled_combined_position = np.minimum(self.combined_position.mul(self.scale_factor, axis=0), self.max_leverage)
+
+        self.scaled_combined_position = self.combined_position.mul(self.scale_factor, axis=0)
+
+        # scale down if the leverage > max leverage
+        self.scaled_combined_position = self.scaled_combined_position.divide(np.maximum(self.scaled_combined_position.sum(axis=1)/self.max_leverage, 1), axis=0)
+        
         self.scaled_combined_ret = self.generate_backtest_return(self.scaled_combined_position)
         self.logger.info('Volatility Target = {:.1f}% | Price Volatility = {:.1f}% | Last Scale Factor = {:.2f}'.format(self.vol_target*100, self.px_vol*100 ,self.scale_factor[-1]))
 
