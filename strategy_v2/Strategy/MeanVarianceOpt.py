@@ -17,7 +17,7 @@ class MeanVarianceOpt(StrategyBase):
                  gamma:float=0.01,
                  hhi:float=0.2,
                  lookback:int=60
-                ):
+                ):        
         if confidence > 2 or confidence < -2:
             raise('confidence has to between -2 and 2')
                 
@@ -152,6 +152,7 @@ class MeanVarianceOpt(StrategyBase):
                 pbar.update(1)
 
         self.position = self.position.loc[self.start_date: self.end_date]
+        self.position *= self.confidence
 
     def get_position(self) -> DataFrame:
         return self.position

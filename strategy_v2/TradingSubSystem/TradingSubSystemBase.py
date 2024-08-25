@@ -34,7 +34,7 @@ class TradingSubSystemBase(TradingSubSystemModel, DataLoader):
         self.vol_target = vol_target
         self.max_leverage = max_leverage
         self.strategy = strategy        
-        self.logger = get_logger('{} [{}]'.format(self.__class__.__name__, ','.join(instruments)))
+        self.logger = get_logger('{} [{}]'.format(self.__class__.__name__, self.__str__()))
 
         # data object which will pass to all underlying strategy
         self.data = {}
@@ -48,7 +48,11 @@ class TradingSubSystemBase(TradingSubSystemModel, DataLoader):
     def __str__(self) -> str:
         strategy_names = ','.join([str(s) for s in self.strategy])
         instrument_names = ','.join(self.instruments)
-        return "{} - {} ({})".format(self.__class__.__name__.replace('TradingSubSystem', ''), instrument_names, strategy_names)   
+        if len(self.instruments) == 1:
+            return "{} ({})".format(instrument_names, strategy_names)   
+        else:
+            return "{}".format(strategy_names)   
+
 
     def set_start_date(self, start_date: datetime):
         '''

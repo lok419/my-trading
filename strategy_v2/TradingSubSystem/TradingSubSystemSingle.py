@@ -15,13 +15,12 @@ class TradingSubSystemSingle(TradingSubSystemBase):
     '''
 
     def __init__(self, *args, **kwargs):   
-        super().__init__(*args, **kwargs)                
-        assert(len(self.instruments) == 1)        
+        super().__init__(*args, **kwargs)                        
 
     def optimize(self):
         '''
             Optimize the capital weights among strategy variations
-            1. Combine different strategy weights from different strategy
+            1.  Combine different strategy weights from different strategy
             2.  Scale the combined weights to match your volatility target
             2a. We use the backtest returns to derive the historical volatility and use that to scale to the volatility target
         '''

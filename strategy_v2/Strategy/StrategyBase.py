@@ -45,9 +45,11 @@ class StrategyBase(object):
     def generate_position(self):
         '''
             Generate the position data. The function should assign "self.position" to a position numpy matrix with size (asset, dates)            
-            Position varies between -1 and 1 which indicate the confidence of the forecast.
+            Position varies between -1 and 1 which indicate the confidence of the forecast.                         
                 - Positive maens Long
-                - Negative means Short                                
+                - Negative means Short  
+
+            Confidence could still be any values, this is useful when you have muliple strategies, you want to assign different confidence to each strategy
             Actual position sizing will be determined at sub-system level
         '''
         pass        
