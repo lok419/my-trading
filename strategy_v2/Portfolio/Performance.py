@@ -47,8 +47,8 @@ class Performance(object):
         display(performance_summary_table(all_rets))
         
         fig = make_subplots(
-            rows=11, cols=1,        
-            row_heights=[0.6, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3],
+            rows=12, cols=1,        
+            row_heights=[0.6, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3],
             subplot_titles=[
                 'Strategy Cumulative Log Return',                
                 'Daily Return (%)',
@@ -58,15 +58,16 @@ class Performance(object):
                 'Rebalanced Portfolio Weights (%) (excl. MTM)',
                 'Rebalanced Portfolio Shares',
                 'Rebalanced Portfolio Value',
-                'Instrument Price',
-                'Instrument Volatility (%)',    
+                'Instrument Price',                
+                'Instrument Volatility 20D (%)',    
+                'Instrument Return (%)',    
                 'Transaction Cost',
             ],    
             vertical_spacing=0.03,
             shared_xaxes=True,                    
         )    
         fig.update_layout(
-            width=1500, height=3700,
+            width=1500, height=4000,
             xaxis_showticklabels=True, 
             xaxis2_showticklabels=True, 
             xaxis3_showticklabels=True,
@@ -78,6 +79,7 @@ class Performance(object):
             xaxis9_showticklabels=True, 
             xaxis10_showticklabels=True, 
             xaxis11_showticklabels=True, 
+            xaxis12_showticklabels=True, 
             hovermode='x',            
         )
 
@@ -93,18 +95,15 @@ class Performance(object):
                 fig.add_trace(go.Scatter(x=r.index, y=cumlative_log_return(r), name=s, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=1, col=1)
                 fig.add_trace(go.Scatter(x=r.index, y=100*r, name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=2, col=1)            
 
-                v20 = r.rolling(20).std()*100*np.sqrt(252)
-                v60 = r.rolling(60).std()*100*np.sqrt(252)
-
-                fig.add_trace(go.Scatter(x=v20.index, y=v20, name=f'1m - {s}', showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=3)), row=3, col=1)
-                fig.add_trace(go.Scatter(x=v60.index, y=v60, name=f'3m - {s}', showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(dash='dash')), row=3, col=1)
+                v20 = r.rolling(20).std()*100*np.sqrt(252)                
+                fig.add_trace(go.Scatter(x=v20.index, y=v20, name=s, showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=3)), row=3, col=1)                
 
                 # Transaction Cost
                 if s == 'Optimized Portfolio':
-                    fig.add_trace(go.Scatter(x=self.port_tc.index, y=self.port_tc.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=11, col=1)
+                    fig.add_trace(go.Scatter(x=self.port_tc.index, y=self.port_tc.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=12, col=1)
 
                 if s == 'Rebalanced Portfolio':
-                    fig.add_trace(go.Scatter(x=self.port_tc_rebal.index, y=self.port_tc_rebal.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=11, col=1)
+                    fig.add_trace(go.Scatter(x=self.port_tc_rebal.index, y=self.port_tc_rebal.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=12, col=1)
 
 
         colors_iter = cycle(colors)                
@@ -125,11 +124,12 @@ class Performance(object):
             pos = self.port_position_rebal_strike[i]
             pos_shs = self.port_position_shs_rebal[i]            
             pos_dp = self.port_position_dp_rebal[i]
+
             px = self.close_px[i]
+            px_return = (1+px.pct_change().fillna(0)).cumprod()*100
 
             r = px / px.shift(1) - 1
-            v20 = r.rolling(20).std()*100*np.sqrt(252)
-            v60 = r.rolling(60).std()*100*np.sqrt(252)
+            v20 = r.rolling(20).std()*100*np.sqrt(252)            
 
             # instrument weights in portfolio
             fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=i, showlegend=True, legendgroup=i, marker=dict(color=c)), row=6, col=1)     
@@ -141,11 +141,13 @@ class Performance(object):
             fig.add_trace(go.Scatter(x=pos_dp.index, y=pos_dp, name=i, showlegend=False, legendgroup=i, marker=dict(color=c)), row=8, col=1) 
 
             # instrument price
-            fig.add_trace(go.Scatter(x=px.index, y=px, name=i, showlegend=False, legendgroup=i, marker=dict(color=c)), row=9, col=1)     
+            fig.add_trace(go.Scatter(x=px.index, y=px, name=i, showlegend=False, legendgroup=i, marker=dict(color=c)), row=9, col=1)                 
             
             # instrument price volatiltiy
-            fig.add_trace(go.Scatter(x=v20.index, y=v20, name=f'1m - {i}', showlegend=False, legendgroup=i, marker=dict(color=c), line=dict(width=3)), row=10, col=1)
-            fig.add_trace(go.Scatter(x=v60.index, y=v60, name=f'3m - {i}', showlegend=False, legendgroup=i, marker=dict(color=c), line=dict(dash='dash')), row=10, col=1)
+            fig.add_trace(go.Scatter(x=v20.index, y=v20, name=i, showlegend=False, legendgroup=i, marker=dict(color=c), line=dict(width=3)), row=10, col=1)            
+
+            # instrument cum return
+            fig.add_trace(go.Scatter(x=px.index, y=px_return, name=i, showlegend=False, legendgroup=i, marker=dict(color=c)), row=11, col=1)     
 
         fig['layout']['yaxis2']['title']= 'Return (%)'
         fig['layout']['yaxis3']['title']= 'Vol (%)'
@@ -153,9 +155,10 @@ class Performance(object):
         fig['layout']['yaxis6']['title']= 'Weight (%)'
         fig['layout']['yaxis7']['title']= 'Shares'
         fig['layout']['yaxis8']['title']= 'Value ($)'
-        fig['layout']['yaxis9']['title']= 'Price ($)'
+        fig['layout']['yaxis9']['title']= 'Price ($)'        
         fig['layout']['yaxis10']['title']= 'Vol (%)'
-        fig['layout']['yaxis11']['title']= 'Cost ($)'
+        fig['layout']['yaxis11']['title']= 'Return (%)'
+        fig['layout']['yaxis12']['title']= 'Cost ($)'
 
         fig.show()
 
