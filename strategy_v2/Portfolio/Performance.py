@@ -52,7 +52,7 @@ class Performance(object):
             subplot_titles=[
                 'Strategy Cumulative Log Return',                
                 'Daily Return (%)',
-                'Volatility - 1m and 3m (%)',
+                'Volatility 1m (%)',
                 'Strategy Weights (%)',
                 'Rebalanced Portfolio Leverage (%) (excl. MTM)',                
                 'Rebalanced Portfolio Weights (%) (excl. MTM)',
