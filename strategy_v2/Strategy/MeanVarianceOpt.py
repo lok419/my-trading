@@ -32,12 +32,12 @@ class MeanVarianceOpt(StrategyBase):
     def __str__(self) -> str:
         return f'MVO - SMA{self.confidence}'
     
-    def expected_return(self, data: dict, pos_date: datetime, **kwargs) -> np.ndarray:
+    def expected_return(self, pos_date: datetime) -> np.ndarray:
         '''
             Expected return based on lookback periods
             return a array of returns
         '''
-        ret = data['px']['Return']        
+        ret = self.data['px']['Return']        
         lookback_end = pos_date - BDay(1)  
         
         # return within lookback periods - MAKE SURE NOT LOOK AHEAD BIAS HERE
@@ -49,11 +49,11 @@ class MeanVarianceOpt(StrategyBase):
         expected_ret = ret.mean(axis=0)
         return expected_ret
 
-    def expected_variance(self, data: dict, pos_date: datetime, **kwargs) -> np.ndarray:
+    def expected_variance(self, pos_date: datetime) -> np.ndarray:
         '''
             Expected stock covariance matrix
         '''
-        ret = data['px']['Return']        
+        ret = self.data['px']['Return']        
         lookback_end = pos_date - BDay(1)  
 
         # return within lookback periods - MAKE SURE NOT LOOK AHEAD BIAS HERE
@@ -112,8 +112,8 @@ class MeanVarianceOpt(StrategyBase):
             # generates position as of SOD of "date", so you only access to data prior to "date"
             for date in dates_arr:        
 
-                expected_ret = self.expected_return(self.data, date)
-                expected_ret_cov = self.expected_variance(self.data, date)                                
+                expected_ret = self.expected_return(date)
+                expected_ret_cov = self.expected_variance(date)                                
 
                 w = cp.Variable(len(self.instruments))                    
                 gamma_par = cp.Parameter(nonneg=True)
