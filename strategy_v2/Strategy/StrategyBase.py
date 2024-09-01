@@ -1,5 +1,6 @@
 from utils.logging import get_logger
 from datetime import datetime
+from pandas.core.frame import DataFrame
 from abc import abstractmethod
 import pandas as pd
 
@@ -13,7 +14,7 @@ class StrategyBase(object):
         self.instruments = instruments
         return self
 
-    def set_data(self, data:dict):
+    def set_data(self, data:dict[DataFrame]):
         self.data = data
         return self
     

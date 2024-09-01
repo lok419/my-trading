@@ -14,7 +14,7 @@ class RandomForest(AlphaModel):
         self.forecast = forecast
         self.train_days = train_days        
     
-    def preprocess_data(self, data:dict):
+    def preprocess_data(self, data:dict[DataFrame]):
         '''
             Preprocess OHCL data and create features
         '''  

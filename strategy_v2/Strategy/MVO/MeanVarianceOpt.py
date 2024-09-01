@@ -13,13 +13,12 @@ from utils.data_helper import add_bday
 class MeanVarianceOpt(StrategyBase):      
 
     def __init__(self, 
-                 alpha_model: AlphaModel,
-                 risk_model: RiskModel,
+                 alpha_model:AlphaModel,
+                 risk_model:RiskModel,
                  confidence:float=1, 
                  opt_freq:int =1, 
                  gamma:float=0.01,
-                 hhi:float=0.2,
-                 lookback:int=60,                                  
+                 hhi:float=0.2,                 
                 ):        
         if confidence > 2 or confidence < -2:
             raise('confidence has to between -2 and 2')
@@ -29,20 +28,19 @@ class MeanVarianceOpt(StrategyBase):
         self.confidence = confidence
         self.opt_freq = opt_freq
         self.gamma = gamma
-        self.hhi = hhi
-        self.lookback = lookback
+        self.hhi = hhi        
 
         super().__init__()
 
     def __str__(self) -> str:
         return f'MVO - {self.alpha_model}{self.confidence}'   
 
-    def load_data(self):
+    def load_data(self, lookback=100):
         '''
             In case the data wasn't passed
         '''        
         if not hasattr(self, 'data') or 'px' not in self.data:
-            data_start = add_bday(self.start_date, -self.lookback)   
+            data_start = add_bday(self.start_date, -lookback)   
             data_end = self.end_date
             self.data['px'] = get_yahoo_data_formatted(self.instruments, data_start, data_end)
 

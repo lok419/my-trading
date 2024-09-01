@@ -12,7 +12,7 @@ class RollingMeanCov(RiskModel):
     def expected_variance(self, pos_date: datetime) -> np.ndarray:
         '''
             Expected stock covariance matrix
-        '''
+        '''        
         ret = self.data['px']['Return']        
         lookback_end = pos_date - BDay(1)  
 
