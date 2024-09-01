@@ -102,7 +102,7 @@ def get_benchmark_return(symbol, start_date, end_date):
         Get Return for a benchmarks from Yahoo                
     """  
 
-    px = yf.download(tickers=symbol,interval="1d",auto_adjust=True, start=start_date, end=end_date + BDay(1))
+    px = yf.download(tickers=symbol,interval="1d", auto_adjust=True, start=start_date, end=end_date + BDay(1))
     px_close = px['Close']
     ret = px_close / px_close.shift(1) - 1
     ret = ret.fillna(0)
