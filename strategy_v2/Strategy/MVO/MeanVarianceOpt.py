@@ -86,7 +86,7 @@ class MeanVarianceOpt(StrategyBase):
             for date in dates_arr:        
 
                 expected_ret = self.alpha_model.expected_return(date)
-                expected_ret_cov = self.risk_model.expected_variance(date)                                
+                expected_ret_cov = self.risk_model.expected_variance(date)                           
 
                 w = cp.Variable(len(self.instruments))                    
                 gamma_par = cp.Parameter(nonneg=True)
@@ -96,14 +96,15 @@ class MeanVarianceOpt(StrategyBase):
 
                 # we use year as basis
                 ret = 252 * expected_ret.T @ w
-                risk = 252 * cp.quad_form(w, expected_ret_cov)                    
+                risk = 252 * cp.quad_form(w, expected_ret_cov)
 
-                constraints = [                    
-                    cp.sum(w) == 1,               
-                    cp.sum_squares(w) <= self.hhi,                    
-                    w <= 1,
-                    w >= 0,
-                ]
+                constraints = []                 
+                constraints.append(cp.sum(w) <= 1)
+                constraints.append(w <= 1)
+                constraints.append(w >= 0)
+                if self.hhi > 0:
+                    constraints.append(cp.sum_squares(w) <= self.hhi)
+                
                 prob = cp.Problem(cp.Maximize(ret - gamma_par * risk), constraints)                            
                 prob.solve()    
 

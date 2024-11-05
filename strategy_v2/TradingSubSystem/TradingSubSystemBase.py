@@ -31,7 +31,7 @@ class TradingSubSystemBase(TradingSubSystemModel, DataLoader):
         '''        
         self.offset = offset     
         self.instruments = instruments
-        self.vol_target = vol_target
+        self.vol_target = vol_target if vol_target is not None else float('nan')
         self.max_leverage = max_leverage
         self.strategy = strategy        
         self.logger = get_logger('{} [{}]'.format(self.__class__.__name__, self.__str__()))

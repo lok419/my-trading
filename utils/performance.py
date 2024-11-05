@@ -141,7 +141,7 @@ def performance_summary_plot(r: pd.Series|dict|pd.DataFrame, strategy: str="", b
         rows=3, cols=1,        
         row_heights=[0.6, 0.3, 0.3],
         subplot_titles=[
-            'Strategy Cumulative Return',
+            'Strategy Cumulative Log Return',
             'Daily Return (%)',
             'Volatility - 1m and 3m (%)',
         ],    
@@ -169,7 +169,7 @@ def performance_summary_plot(r: pd.Series|dict|pd.DataFrame, strategy: str="", b
 
     for s, r in rets_dict.items():      
         c = colors.__next__()
-        fig.add_trace(go.Scatter(x=r.index, y=cumulative_return(r), name=s, legendgroup=s, marker=dict(color=c)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=r.index, y=cumlative_log_return(r), name=s, legendgroup=s, marker=dict(color=c)), row=1, col=1)
         fig.add_trace(go.Scatter(x=r.index, y=100*r, name=s, legendgroup=s, showlegend=False, marker=dict(color=c)), row=2, col=1)
         fig['layout']['yaxis2']['title']= 'Return (%)'
 

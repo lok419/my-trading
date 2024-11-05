@@ -8,8 +8,7 @@ class TradingSubSystemSingle(TradingSubSystemBase):
     '''
         Base Trading SubSystem which includes basic function of getting data, backtest, performance
 
-        This SubSystem Class is designed for basic Buy and Hold strategy or simple algorithm rule based strategy, given
-            - Only support single instrument            
+        This SubSystem Class is designed for basic Buy and Hold strategy or simple algorithm rule based strategy, given            
             - Equal weighted weights from strategy variations
             - Position sizing is based on instrument's volatility and your volatility target
     '''
@@ -49,13 +48,12 @@ class TradingSubSystemSingle(TradingSubSystemBase):
             Simplest way is to use simple average.
             We can also adjust with the correlation of the strategies, because the combined ways are likely to be samller 
             when they're not perfectly correlated            
-        """
-
-        strategies = [x[0] for x in position.columns]
+        """        
+        strategies = list(set([x[0] for x in position.columns]))
         for i, s in enumerate(strategies):
             combined_position = position[s] if i == 0 else combined_position + position[s]
-
-        combined_position /= len(strategies)
+        
+        combined_position /= len(strategies)        
         return combined_position
 
     def position_sizing(self, 
@@ -68,10 +66,12 @@ class TradingSubSystemSingle(TradingSubSystemBase):
             We use Simple volatility for now
 
             Need to shift the scale factor by 1 days because we only know the volatility on T-1 when we sizing the position on T
-        """        
-        close_vol = annualized_volatility_ts(px_ret, windows=px_vol_windows)        
-        return (vol_target / close_vol).shift(1).bfill(), close_vol[-1]
+        """ 
+        close_vol = annualized_volatility_ts(px_ret, windows=px_vol_windows)               
+        scale_factor = (vol_target / close_vol).shift(1).bfill() if vol_target > 0 else np.ones(len(close_vol))                            
 
+        return scale_factor, close_vol[-1]
+        
     def get_position(self) -> DataFrame:
         return self.scaled_combined_position
     

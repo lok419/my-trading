@@ -52,6 +52,21 @@ def time_series_coint_johansen(ts, normalize=True, ci=0.99):
 
     return evec, r
 
+def bootstrapped(x:list|np.ndarray, n:int=-1, k:int=1000) -> list:
+    '''
+        Bootstrapped samples of a given array
+        n: number of samples
+        k: number of bootstrapped samples
+    '''
+
+    if n == -1:
+        n = len(x)
+
+    x_b = [np.mean(np.random.choice(x, size=n, replace=True)) for _ in range(k)]
+    if type(x) is np.ndarray:
+        x_b = np.array(x_b)
+
+    return x_b
 
 if __name__ == '__main__':
     print(time_series_half_life([1,2,3,3,2,1,2,3,2,1]))
