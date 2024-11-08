@@ -7,14 +7,16 @@ from datetime import datetime
 import cvxpy as cp
 from strategy_v2.Strategy.MVO import AlphaModel, RiskModel
 from strategy_v2.Strategy.StrategyBase import StrategyBase
+from strategy_v2.Strategy.MVO.AlphaModel import ZeroAlpha
+from strategy_v2.Strategy.MVO.RiskModel import ZeroCov
 from utils.data import get_yahoo_data_formatted
 from utils.data_helper import add_bday
 
 class MeanVarianceOpt(StrategyBase):      
 
     def __init__(self, 
-                 alpha_model:AlphaModel,
-                 risk_model:RiskModel,
+                 alpha_model:AlphaModel=ZeroAlpha(),
+                 risk_model:RiskModel=ZeroCov(),
                  confidence:float=1, 
                  opt_freq:int =1, 
                  gamma:float=0.01,
@@ -28,7 +30,11 @@ class MeanVarianceOpt(StrategyBase):
         self.confidence = confidence
         self.opt_freq = opt_freq
         self.gamma = gamma
-        self.hhi = hhi        
+        self.hhi = hhi
+
+        # store the historcal signals
+        self.alphas = []
+        self.risks = []
 
         super().__init__()
 
@@ -78,15 +84,17 @@ class MeanVarianceOpt(StrategyBase):
             dates_arr.append(date)
             date += BDay(self.opt_freq)
 
-        last_weight = np.ones(len(self.instruments)) / len(self.instruments)        
-
+        last_weight = np.ones(len(self.instruments)) / len(self.instruments)       
         with tqdm(total=len(dates_arr)) as pbar:
 
             # generates position as of SOD of "date", so you only access to data prior to "date"
             for date in dates_arr:        
 
                 expected_ret = self.alpha_model.expected_return(date)
-                expected_ret_cov = self.risk_model.expected_variance(date)                           
+                expected_ret_cov = self.risk_model.expected_variance(date)
+
+                self.alphas.append(expected_ret)
+                self.risks.append(expected_ret_cov)
 
                 w = cp.Variable(len(self.instruments))                    
                 gamma_par = cp.Parameter(nonneg=True)
@@ -127,6 +135,7 @@ class MeanVarianceOpt(StrategyBase):
 
         self.position = self.position.loc[self.start_date: self.end_date]
         self.position *= self.confidence
+        self.alphas = pd.DataFrame(self.alphas, columns=close.columns, index=dates_arr)
 
     def get_position(self) -> DataFrame:
         return self.position

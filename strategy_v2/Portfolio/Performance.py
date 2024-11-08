@@ -84,7 +84,7 @@ class Performance(object):
         )
 
         colors = plotly.colors.DEFAULT_PLOTLY_COLORS
-        colors_iter = cycle(colors)        
+        colors_iter = cycle(colors)          
         
         for s, r in all_rets.items():                              
             # do not show strategy returns when show_all_rets = False
@@ -100,20 +100,25 @@ class Performance(object):
 
                 # Transaction Cost
                 if s == 'Optimized Portfolio':
+                    leverage_opt = self.port_position.sum(axis=1)          
+                    fig.add_trace(go.Scatter(x=leverage_opt.index, y=leverage_opt*100, name=s, showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)            
                     fig.add_trace(go.Scatter(x=self.port_tc.index, y=self.port_tc.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=12, col=1)
+                    
 
-                if s == 'Rebalanced Portfolio':
+                elif s == 'Rebalanced Portfolio':
+                    leverage_rebal = self.port_position_rebal_strike.sum(axis=1)
+                    fig.add_trace(go.Scatter(x=leverage_rebal.index, y=leverage_rebal*100, name=s,showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)        
                     fig.add_trace(go.Scatter(x=self.port_tc_rebal.index, y=self.port_tc_rebal.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=12, col=1)
 
+                elif s not in benchmark:
+                    lev = self.position[s].sum(axis=1)
+                    fig.add_trace(go.Scatter(x=lev.index, y=lev*100, name=s, showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)        
 
         colors_iter = cycle(colors)                
         for s in systems_name:     
             c = colors_iter.__next__()           
             w = self.port_w[s]            
-            fig.add_trace(go.Scatter(x=w.index, y=100*w, name=s, showlegend=not show_all_rets, legendgroup=s, marker=dict(color=c)), row=4, col=1)            
-
-        leverage = self.port_position_rebal_strike.sum(axis=1)        
-        fig.add_trace(go.Scatter(x=leverage.index, y=leverage*100, showlegend=False, marker=dict(color=colors[0])), row=5, col=1)                
+            fig.add_trace(go.Scatter(x=w.index, y=100*w, name=s, showlegend=not show_all_rets, legendgroup=s, marker=dict(color=c)), row=4, col=1)                  
 
         instruments = self.port_position.columns
         colors_iter = cycle(colors)        

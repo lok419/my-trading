@@ -6,3 +6,4 @@ from .LGBM import LGBM
 from .QuantileModel import QuantileModel
 from .RSI import RSI
 from .MultipleAlpha import MultipleAlpha
+from .ZeroAlpha import ZeroAlpha

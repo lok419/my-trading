@@ -3,6 +3,7 @@ import math
 from strategy_v2.TradingSubSystem import TradingSubSystemBase
 from strategy_v2.TransactionCost import TransactionCostModel
 from strategy_v2.Portfolio import Performance, PortfolioModel, RebalancerIter
+from strategy_v2.Portfolio.Constant import SystemStyle
 from abc import abstractmethod
 from pandas.tseries.offsets import BDay
 from utils.logging import get_logger
@@ -28,12 +29,13 @@ class PortfolioBase(PortfolioModel, Performance):
     def __init__(self,
                  name:str='',
                  systems: list[TradingSubSystemBase]=[],
+                 systems_style: SystemStyle=SystemStyle.VERTICAL,
                  capital:float=10000,
                  offset:float=1,
                  rebalance_freq:float=20,
                  rebalance_iter:RebalancerIter=None,                 
                  rebalance_inertia:float=0.1,
-                 tc_model:TransactionCostModel=None,
+                 tc_model:TransactionCostModel=None,                 
         ):
 
         '''
@@ -47,6 +49,7 @@ class PortfolioBase(PortfolioModel, Performance):
         '''
         self.name = name
         self.systems = systems
+        self.systems_style = systems_style
         self.capital = capital
         self.offset = offset
         self.rebalance_freq = rebalance_freq
@@ -164,11 +167,19 @@ class PortfolioBase(PortfolioModel, Performance):
             self.port_w             = optimzied weights among different sub-system
             self.port_position      = optimzied weights among differnt stocks, deriving from self.port_w
             self.port_position_shs  = optimzied shares among different stocks, deriving from self.port_w
-        '''        
 
+            There are two style to construct a portfolios across different sub-systems
+            Vertical:   position from sub-systems are "ADDED" together then normalized
+            Horizontal: position from sub-systems are "MULTIPLIED" together with the corresponding weights
+        '''  
         # FIXME: need to make sure the self.port_position are in same orders as self.close_px, now this is implied by the orders of sub-systems
-        for i, system in enumerate(self.systems):
-            pos = self.position[str(system)].mul(self.port_w[str(system)], axis=0)                                            
+        for i, system in enumerate(self.systems): 
+
+            if self.systems_style == SystemStyle.VERTICAL:
+                pos = self.position[str(system)]                
+            else:
+                pos = self.position[str(system)].mul(self.port_w[str(system)], axis=0)                
+
             if i == 0:
                 self.port_position = pos
             else:
@@ -176,26 +187,35 @@ class PortfolioBase(PortfolioModel, Performance):
                     if col in self.port_position:
                         self.port_position[col] += pos[col]                        
                     else:
-                        self.port_position = pd.merge(self.port_position, pos, how='outer', on=['Date'], validate='1:1')
-                                         
+                        self.port_position = pd.merge(self.port_position, pos[col], how='outer', on=['Date'], validate='1:1')
+                        
+        self.port_position = self.port_position.fillna(0)
         '''
+            If systems are scaled vertically, normalizes the position to 100%
+        '''               
+        if self.systems_style == SystemStyle.VERTICAL:            
+            self.port_position = self.port_position.div(self.port_position.sum(axis=1), axis=0)        
+
+        '''    
             Three ways to calculate theoretical portfolio returns
-                1. use sub system returns times the optimized weights
+                1. use sub system returns times the optimized weights (only for horizontal style)
                 2. use actual position weight times instrument percentage returns
                 3. use actual position shares times instrument dollar return
-            All above should yield the same daily returns, just in case, we want to assert (1) == (2) == (3)
-        '''        
-
+            All above should yield the same daily returns, just in case, we want to assert (1) == (2) == (3)           
+        '''         
         # (1) sub system return * optimized weights
-        self.port_ret = (self.ret * self.port_w).sum(axis=1)        
+        port_ret1 = (self.ret * self.port_w).sum(axis=1)            
 
         # (2) actual position * instrument return %
         close_ret = self.close_px_raw.pct_change().fillna(0)
         close_ret = close_ret.loc[self.start_date:self.end_date]
         port_ret2 = (self.port_position * close_ret).sum(axis=1)
 
-        assert(np.abs(port_ret2 - self.port_ret) >= 1e-7).sum() == 0, 'portfolio returns has discrepancy'
-
+        if self.systems_style == SystemStyle.VERTICAL:
+            self.port_ret = port_ret2
+        else:
+            self.port_ret = port_ret1            
+        
         # fill all null to zeros
         self.port_position = self.port_position.fillna(0)        
         self.port_ret = self.port_ret.fillna(0)
@@ -219,7 +239,11 @@ class PortfolioBase(PortfolioModel, Performance):
         port_ret3 = (self.capital + ret_cum_dp).pct_change().fillna(0)
         port_ret3.loc[self.start_date] = ret_cum_dp.iloc[0] / self.capital
 
-        assert (np.abs(port_ret3 - self.port_ret) >= 1e-7).sum() == 0, 'portfolio returns has discrepancy'
+        if self.systems_style == SystemStyle.HORIZONTAL:
+            assert (np.abs(port_ret1 - port_ret2) >= 1e-7).sum() == 0, 'portfolio returns has discrepancy'
+            assert (np.abs(port_ret1 - port_ret3) >= 1e-7).sum() == 0, 'portfolio returns has discrepancy'
+
+        assert (np.abs(port_ret3 - port_ret2) >= 1e-7).sum() == 0, 'portfolio returns has discrepancy'
 
         # add transaction cost
         if self.tc_model is not None:
