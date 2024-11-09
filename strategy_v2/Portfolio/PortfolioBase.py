@@ -191,10 +191,10 @@ class PortfolioBase(PortfolioModel, Performance):
                         
         self.port_position = self.port_position.fillna(0)
         '''
-            If systems are scaled vertically, normalizes the position to 100%
+            If systems are scaled vertically, normalizes the position to 100% if total leverage is > 100%
         '''               
         if self.systems_style == SystemStyle.VERTICAL:            
-            self.port_position = self.port_position.div(self.port_position.sum(axis=1), axis=0)        
+            self.port_position = self.port_position.div(np.maximum(self.port_position.sum(axis=1), 1), axis=0)
 
         '''    
             Three ways to calculate theoretical portfolio returns

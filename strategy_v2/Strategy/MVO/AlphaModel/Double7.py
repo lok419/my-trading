@@ -3,25 +3,20 @@ import numpy as np
 from datetime import datetime
 from strategy_v2.Strategy.MVO import AlphaModel
 from utils.data_helper import add_bday
-from utils.ta import rsi
 
 
-class RSI(AlphaModel):      
+class Double7(AlphaModel):      
     '''
-        Short Period RSI Mean Reverting signals
-
-        2-period RSI indicators sorts of capturing the short terms mean reverting behavior of the stocks
-
-            1. spot price > 200MA
-            2. entry when 2-period RSI < 5
-            3. exit when price > 5MA        
+        Double 7's Strategy        
+        1. stocks above 200days MA
+        2. entry when closes at 7days low 
+        3. exit when closes at 7days high     
     '''
-    def __init__(self, rsi_windows=2, rsi_threshold=10):           
-        self.rsi_windows = rsi_windows
-        self.rsi_threshold = rsi_threshold
-
+    def __init__(self, periods:int=7):
+        self.periods = periods
+        
     def __str__(self) -> str:
-        return f"RSI{self.rsi_windows}"
+        return f"Double{self.periods}"
     
     def expected_return(self, pos_date: datetime) -> np.ndarray:
 
@@ -34,13 +29,13 @@ class RSI(AlphaModel):
 
         assert max(df.index) < pos_date, 'Optimization has lookahead bias'             
 
-        df_close = df['Close']        
-        df_rsi = rsi(df_close, window=self.rsi_windows)
-        df_200ma = df_close.rolling(200).mean()
-        df_5ma = df_close.rolling(5).mean()    
+        df_close = df['Close']                
+        df_200ma = df_close.rolling(200).mean()        
+        df_7d_low = df_close.rolling(self.periods).min()
+        df_7d_high = df_close.rolling(self.periods).max()
 
-        df_entry = 1 * ((df_rsi < self.rsi_threshold) & (df_close > df_200ma))
-        df_exit = -1 * (df_close > df_5ma)
+        df_entry = 1 * ((df_close == df_7d_low) & (df_close > df_200ma))
+        df_exit = -1 * ((df_close == df_7d_high) | (df_close < df_200ma))
 
         df_sig = df_entry + df_exit
         df_pos = df_sig.copy()

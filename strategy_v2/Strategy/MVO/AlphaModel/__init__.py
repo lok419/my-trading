@@ -5,5 +5,6 @@ from .LookAheadBias import LookAheadBias
 from .LGBM import LGBM
 from .QuantileModel import QuantileModel
 from .RSI import RSI
+from .Double7 import Double7
 from .MultipleAlpha import MultipleAlpha
 from .ZeroAlpha import ZeroAlpha
