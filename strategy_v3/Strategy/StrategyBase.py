@@ -58,8 +58,17 @@ class StrategyBase(StrategyModel):
             self.logger.setLevel('CRITICAL')        
 
         # 5m -> 5mins for round function
-        self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
-        self.interval_min = int(self.interval.replace('m', ''))
+        if self.interval.endswith('m'):
+            self.interval_round = self.interval + 'in' if self.interval.endswith('m') else self.interval
+            self.interval_min = int(self.interval.replace('m', ''))
+
+        elif self.interval.endswith('h'):
+            self.interval_round = self.interval
+            self.interval_min = int(self.interval.replace('h', '')) * 60
+
+        else:
+            raise Exception(f'interval {self.interval} is not supported')
+
         self.execute_start_time = self.get_current_time()      
 
         def count_digit(x: str) -> int:
