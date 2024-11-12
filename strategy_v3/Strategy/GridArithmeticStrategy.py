@@ -22,6 +22,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                  position_size: float = 100,
                  hurst_exp_mr_threshold: float = 0.5,
                  hurst_exp_mo_threshold: float = float('inf'),                 
+                 stoploss_interval: float = float('inf'),
                  status: str = STATUS.RUN,
                  start_date: str = None,
                  verbose: bool = True,  
@@ -38,6 +39,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             position_size:          Position for each orders in terms of $USD
             hurst_exp_mr_threshold: exponent ratio threshold for mean reverting
             hurst_exp_mo_threshold: exponent ratio threshold for momentum
+            stoploss_interval:      close the grid orders after the defined periods
             status:                 user can set status to control the strategy behavior
             start_date:             indicate the start time of the strategy so that we can extract the whole performance history of a strategy. The time is based on HongKong Time
             verbose:                True to print the log message
@@ -59,7 +61,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         self.vol_stoploss_scale = vol_stoploss_scale
         self.position_size = position_size
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
-        self.hurst_exp_mo_threshold = hurst_exp_mo_threshold        
+        self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
+        self.stoploss_interval = stoploss_interval        
 
         # this saves the current grid stats
         self.grid_id = 0
@@ -185,6 +188,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             return        
         
         grid_status = self.get_grid_status()
+        grid_active_interval = self.get_grid_active_interval(date)              
         ts_prop = self.get_ts_prop(data)        
         self.logger.info('status: {}, grid_status: {}, ts_prop: {}, hurst_exponent: {:.2f}.'.format(self.status.name, grid_status.name, ts_prop.name, hurst_exponent))
 
@@ -222,8 +226,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         '''
             Check the close price and determine if we need stop loss        
             for real trading, we don't need a actual price for stoploss
-        '''        
-        if grid_status == GRID_STATUS.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1]): 
+        '''                
+        if grid_status == GRID_STATUS.ACTIVE and (close < self.stoploss[0] or close > self.stoploss[1] or grid_active_interval > self.stoploss_interval):            
             stop_px = close
             stop_px = round(stop_px, self.price_decimal)
             self.logger.info('stop loss are triggered at {}.'.format(stop_px))
@@ -249,6 +253,24 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             return GRID_STATUS.NEUTRAL
         else:
             return GRID_STATUS.ACTIVE
+        
+    def get_grid_active_interval(self, date: datetime) -> float:
+        '''
+            Active interval of the outstanding grids
+        '''
+        if self.get_grid_status() == GRID_STATUS.ACTIVE:
+            all_orders = self.get_all_orders()
+            last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]
+            last_grid_time = min(last_grid['time'].values)
+
+            last_grid_time = pd.to_datetime(last_grid_time).tz_localize(None)
+            date = pd.to_datetime(date).tz_localize(None)     
+            
+            active_time = (date - last_grid_time).total_seconds() / 60
+            active_interval = active_time / self.interval_min   
+            return active_interval
+        else:
+            return 0
         
     def get_ts_prop(self, data: dict) -> TS_PROP:
         hurst_exponent = data['hurst_exponent']
@@ -284,7 +306,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
 
             Real trading only: We also need to make sure the filter out orders before strategy start-time
         '''
-        all_orders = self.get_all_orders()                 
+        all_orders = self.get_all_orders()
         last_grid = all_orders[all_orders['clientOrderId'].str.contains(f'_gridid{self.grid_id}_')]
 
         pending = last_grid.copy()        
@@ -369,7 +391,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         #momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['High_t2'] and data['Low_t2'] > data['High_t4']
         #momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Low_t2'] and data['High_t2'] < data['Low_t4']
 
-        momentum_up2 = close_chg < 0 and current_px < close_sma and current_px > data['Close_t2'] and data['Close_t2'] > data['Close_t4']
+        momentum_up2 = close_chg > 0 and current_px > close_sma and current_px > data['Close_t2'] and data['Close_t2'] > data['Close_t4']
         momentum_dw2 = close_chg < 0 and current_px < close_sma and current_px < data['Close_t2'] and data['Close_t2'] < data['Close_t4']
 
         # mean revert - current price are same as moving average
