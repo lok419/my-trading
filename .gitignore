@@ -165,3 +165,19 @@ cython_debug/
 *.pl
 /strategy_v3/execute.json
 catboost_info*
+
+# Airflow configuration
+airflow.cfg
+airflow_login.py
+dbinit.py
+initdb.py
+secrets.py
+
+# Airflow sqlite databases
+airflow.db
+
+# Airflow temporary artifacts
+airflow/git_version
+airflow/logs/
+airflow-webserver.pid
+webserver_config.py
