@@ -27,6 +27,10 @@ class StrategyModel(ABC):
         pass
 
     @abstractmethod
+    def run_once():
+        pass
+
+    @abstractmethod
     def cancel_all_orders():
         pass
 

@@ -260,7 +260,7 @@ class StrategyBase(StrategyModel):
             end_date:       query end date of the orders
             offset:         lookback period to get the orders if start_date is not given
         '''
-        start_date = start_date if start_date is not None else self.get_current_time().floor('1d') - timedelta(days=offset)        
+        start_date = start_date if start_date is not None else self.start_date
         end_date = end_date if end_date is not None else datetime(2100,1,1, tzinfo=self.timezone)
         
         df_orders = self.executor.get_all_orders(self.instrument, trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date)
@@ -322,8 +322,18 @@ class StrategyBase(StrategyModel):
         '''
         time = self.get_current_time()
         return self.is_close_period() and time.hour == 23
+    
+    def run_once(self, lookback:str):
+        '''
+            Function executed one airflow dag
+        '''                
+        self.load_data(lookback)                
+        df = self.df
+        data = self.df.iloc[-1]                
+        self.sanity_check_data(df, data)
+        self.execute(data)
 
-    def run(self, lookback:str):
+    def run(self, lookback:str, repeat:bool=False):
         '''
             Actual function to execute the strategy repeatedly
         '''

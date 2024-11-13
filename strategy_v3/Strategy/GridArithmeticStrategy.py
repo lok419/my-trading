@@ -518,10 +518,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             offset:         lookback period to get the orders if start_date is not given
         '''
         df_orders = super().get_all_orders(trade_details=trade_details, limit=limit, start_date=start_date, end_date=end_date, offset=offset)
-                
-        # some manual adjusting on orders id
-        df_orders['clientOrderId'] = np.where(df_orders['orderId'] == 249865056, 'grid_SOLFDUSDv1_gridid4_MD_close', df_orders['clientOrderId'])
-
+                        
         # find the grid_id of orders
         df_orders['grid_id'] = df_orders['clientOrderId'].apply(lambda x: int(re.search(r"(?<=gridid)\d+(?=_)", x)[0]))
 

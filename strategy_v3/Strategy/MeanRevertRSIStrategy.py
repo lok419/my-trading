@@ -66,7 +66,7 @@ class MeanRevertRSIStrategy(StrategyBase, StrategyPerformance):
         '''
         super().set_strategy_id(strategy_id)
 
-        if reload and not self.is_backtest() and self.mr_id == 0:            
+        if reload and not self.is_backtest() and self.trd_id == 0:            
             if force_reload_all:
                 df_orders = self.get_all_orders(start_date=self.start_date)
             else:

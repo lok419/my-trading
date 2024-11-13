@@ -167,7 +167,6 @@ cython_debug/
 catboost_info*
 
 # Airflow configuration
-airflow.cfg
 airflow_login.py
 dbinit.py
 initdb.py
