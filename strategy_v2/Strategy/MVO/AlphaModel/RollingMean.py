@@ -10,7 +10,7 @@ class RollingMean(AlphaModel):
         self.lookback = lookback
 
     def __str__(self):
-        return super().__str__() + str(self.lookback)
+        return f'{super().__str__()}({self.lookback})'
 
     def expected_return(self, pos_date: datetime) -> np.ndarray:
         '''

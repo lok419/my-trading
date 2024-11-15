@@ -16,7 +16,7 @@ class Double7(AlphaModel):
         self.periods = periods
         
     def __str__(self) -> str:
-        return f"Double{self.periods}"
+        return f"Double({self.periods})"
     
     def expected_return(self, pos_date: datetime) -> np.ndarray:
 

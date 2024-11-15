@@ -21,7 +21,7 @@ class RSI(AlphaModel):
         self.rsi_threshold = rsi_threshold
 
     def __str__(self) -> str:
-        return f"RSI{self.rsi_threshold}|{self.rsi_windows}"
+        return f"RSI({self.rsi_threshold},{self.rsi_windows})"
     
     def expected_return(self, pos_date: datetime) -> np.ndarray:
 

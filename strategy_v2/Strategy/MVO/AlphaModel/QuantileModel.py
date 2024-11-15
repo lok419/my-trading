@@ -31,7 +31,7 @@ class QuantileModel(AlphaModel):
         self.n = n
 
     def __str__(self) -> str:
-        return f"Quantile{self.q}"
+        return f"Quantile({self.lookback},{self.q},{self.k},{self.n})"
     
     def expected_return(self, pos_date: datetime) -> np.ndarray:
 

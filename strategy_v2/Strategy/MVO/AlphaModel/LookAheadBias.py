@@ -11,6 +11,9 @@ class LookAheadBias(AlphaModel):
     '''
     def __init__(self, lookahead = 10):         
         self.lookahead = lookahead                                           
+
+    def __str__(self):
+        return f'{super().__str__()}({self.lookahead})'
     
     def expected_return(self, pos_date: datetime) -> np.ndarray:
         '''

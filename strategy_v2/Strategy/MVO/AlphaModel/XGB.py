@@ -12,6 +12,9 @@ class XGB(AlphaModel):
     def __init__(self, forecast=10, train_days=30):                                        
         self.forecast = forecast
         self.train_days = train_days
+
+    def __str__(self):
+        return f'{super().__str__()}({self.forecast},{self.train_days})'
     
     def preprocess_data(self, data:dict[DataFrame]):
         '''
