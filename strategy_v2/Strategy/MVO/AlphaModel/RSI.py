@@ -21,7 +21,7 @@ class RSI(AlphaModel):
         self.rsi_threshold = rsi_threshold
 
     def __str__(self) -> str:
-        return f"RSI{self.rsi_windows}"
+        return f"RSI{self.rsi_threshold}|{self.rsi_windows}"
     
     def expected_return(self, pos_date: datetime) -> np.ndarray:
 
@@ -30,25 +30,31 @@ class RSI(AlphaModel):
 
         df = self.data['px']
         df = df[:lookback_end]
-        df = df.tail(200)        
+        df = df.tail(200)
 
-        assert max(df.index) < pos_date, 'Optimization has lookahead bias'             
+        assert max(df.index) < pos_date, 'Optimization has lookahead bias'
 
         df_close = df['Close']        
         df_rsi = rsi(df_close, window=self.rsi_windows)
         df_200ma = df_close.rolling(200).mean()
-        df_5ma = df_close.rolling(5).mean()    
+        df_5ma = df_close.rolling(5).mean()
 
-        df_entry = 1 * ((df_rsi < self.rsi_threshold) & (df_close > df_200ma))
-        df_exit = -1 * (df_close > df_5ma)
+        # for RSI threshold < 50, we treat this as buy strategy
+        # for RSI threshold > 50, we treat this as sell strategy (still return a positive number)
+        if self.rsi_threshold < 50:
+            df_entry = 1 * ((df_rsi < self.rsi_threshold) & (df_close > df_200ma))
+            df_exit = -1 * (df_close > df_5ma)
+        else:
+            df_entry = 1 * ((df_rsi > self.rsi_threshold) & (df_close > df_200ma))
+            df_exit = -1 * (df_close < df_5ma)
 
         df_sig = df_entry + df_exit
         df_pos = df_sig.copy()
 
         # re-create the position based on signals
         for i in range(1, len(df_pos)):
-            df_pos.iloc[i] = df_pos.iloc[i] + df_pos.iloc[i-1]
-            df_pos.iloc[i] = np.clip(df_pos.iloc[i], 0, 1)
+            df_pos.iloc[i] = df_pos.iloc[i] + df_pos.iloc[i-1]            
+            df_pos.iloc[i] = np.clip(df_pos.iloc[i], 0, 1)            
 
         expected_ret = df_pos.iloc[-1].values
             

@@ -39,7 +39,7 @@ class MeanVarianceOpt(StrategyBase):
         super().__init__()
 
     def __str__(self) -> str:
-        return f'MVO - {self.alpha_model}{self.confidence}'   
+        return f'MVO - {self.alpha_model}{self.confidence}|'   
 
     def load_data(self, lookback=100):
         '''

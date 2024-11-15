@@ -172,6 +172,7 @@ class PortfolioBase(PortfolioModel, Performance):
             Vertical:   position from sub-systems are "ADDED" together then normalized
             Horizontal: position from sub-systems are "MULTIPLIED" together with the corresponding weights
         '''  
+        
         # FIXME: need to make sure the self.port_position are in same orders as self.close_px, now this is implied by the orders of sub-systems
         for i, system in enumerate(self.systems): 
 
@@ -194,6 +195,7 @@ class PortfolioBase(PortfolioModel, Performance):
             If systems are scaled vertically, normalizes the position to 100% if total leverage is > 100%
         '''               
         if self.systems_style == SystemStyle.VERTICAL:            
+            self.port_position = np.maximum(self.port_position, 0)
             self.port_position = self.port_position.div(np.maximum(self.port_position.sum(axis=1), 1), axis=0)
 
         '''    
