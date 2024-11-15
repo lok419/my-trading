@@ -2,9 +2,11 @@ from plotly.subplots import make_subplots
 from itertools import cycle
 from IPython.display import display
 from utils.performance import get_benchmark_return, performance_summary_table, cumulative_return, cumlative_log_return
+from pandas.tseries.offsets import BDay
 import plotly.graph_objects as go
 import plotly
 import numpy as np
+import math
 
 class Performance(object):
     '''
@@ -167,4 +169,77 @@ class Performance(object):
 
         fig.show()
 
+    def portfolio_breakdown(self, lookback=20):
+        '''
+            Breaking each subsystem into instrument holdings
+        '''
+        end_date = self.end_date
+        start_date = end_date - BDay(lookback)
+
+        cols = 3 
+        rows = math.ceil(len(self.systems) / cols)
+
+        fig = make_subplots(            
+            rows=rows, cols=cols,                    
+            subplot_titles=[str(s) for s in self.systems],    
+            vertical_spacing=0.15,     
+            shared_xaxes=True,            
+        )   
+
+        fig.update_layout(
+            title=f'Sub-Portfolios Breakdown (Last {lookback} BDays)',
+            width=1500, height=150+250*rows,                   
+            hovermode='x',            
+        )
+        fig.update_xaxes(showticklabels=True)
+        fig.update_xaxes(matches='x')     
+
+        showlegend = {}
+        for idx, s in enumerate(self.systems):   
+            for i in s.instruments:
+                pos = s.position[str(s)][i][start_date:end_date]
+                fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=i, legendgroup=i, showlegend=showlegend.get(i, True)), row=idx//cols+1, col=idx%cols+1)     
+                showlegend[i] = False
+
+        fig.show()
+
+    def instrument_breakdown(self, lookback=20):
+        '''
+            Breaking each instrument by holding in each system
+        '''
+        end_date = self.end_date
+        start_date = end_date - BDay(lookback)
+
+        # preserve the original orders while dropping duplicates
+        instruments = [s.instruments for s in self.systems]
+        instruments = list(dict.fromkeys(np.concatenate(instruments).tolist()))
+
+        cols = 3 
+        rows = math.ceil(len(instruments) / cols)        
+
+        fig = make_subplots(            
+            rows=rows, cols=cols,                    
+            subplot_titles=[str(i) for i in instruments],    
+            vertical_spacing=0.05,     
+            shared_xaxes=True,             
+        )   
+
+        fig.update_layout(
+            title=f'Instrument Breakdown (Last {lookback} BDays)',
+            width=1500, height=150+250*rows,                   
+            hovermode='x', 
+        )
+        fig.update_xaxes(showticklabels=True)
+        fig.update_xaxes(matches='x') 
+
+        showlegend = {}
+        for idx, i in enumerate(instruments):
+            for s in self.systems:
+                pos = s.position[str(s)]
+                if i in pos.columns:
+                    pos = pos[i][start_date:end_date]                    
+                    fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=str(s), legendgroup=str(s), showlegend=showlegend.get(str(s), True)), row=idx//cols+1, col=idx%cols+1)
+                    showlegend[str(s)] = False
+
+        fig.show()
         
