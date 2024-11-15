@@ -85,7 +85,7 @@ class Performance(object):
             hovermode='x',            
         )
 
-        colors = plotly.colors.DEFAULT_PLOTLY_COLORS
+        colors = plotly.colors.qualitative.Plotly
         colors_iter = cycle(colors)          
         
         for s, r in all_rets.items():                              
@@ -188,17 +188,22 @@ class Performance(object):
 
         fig.update_layout(
             title=f'Sub-Portfolios Breakdown (Last {lookback} BDays)',
-            width=1500, height=150+250*rows,                   
+            width=1500, height=170+250*rows,                   
             hovermode='x',            
         )
         fig.update_xaxes(showticklabels=True)
-        fig.update_xaxes(matches='x')     
+        fig.update_xaxes(matches='x')                     
 
         showlegend = {}
+        colors = plotly.colors.qualitative.Plotly
+        colors_iter = cycle(colors)  
+        colorsmap = {}
+
         for idx, s in enumerate(self.systems):   
             for i in s.instruments:
-                pos = s.position[str(s)][i][start_date:end_date]
-                fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=i, legendgroup=i, showlegend=showlegend.get(i, True)), row=idx//cols+1, col=idx%cols+1)     
+                colorsmap[i] = colorsmap[i] if i in colorsmap else next(colors_iter)
+                pos = s.position[str(s)][i][start_date:end_date]                
+                fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=i, legendgroup=i, showlegend=showlegend.get(i, True), marker=dict(color=colorsmap[i])), row=idx//cols+1, col=idx%cols+1)     
                 showlegend[i] = False
 
         fig.show()
@@ -226,18 +231,24 @@ class Performance(object):
 
         fig.update_layout(
             title=f'Instrument Breakdown (Last {lookback} BDays)',
-            width=1500, height=150+250*rows,                   
+            width=1500, height=170+250*rows,                   
             hovermode='x', 
         )
         fig.update_xaxes(showticklabels=True)
         fig.update_xaxes(matches='x') 
 
-        showlegend = {}
+        showlegend = {}        
+        colors = plotly.colors.qualitative.Plotly
+        colors_iter = cycle(colors)  
+        colorsmap = {}
+
         for idx, i in enumerate(instruments):
             for s in self.systems:
                 pos = s.position[str(s)]
                 if i in pos.columns:
+                    colorsmap[s] = colorsmap[s] if s in colorsmap else next(colors_iter)
                     pos = pos[i][start_date:end_date]                    
+                    #fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=str(s), legendgroup=str(s), showlegend=showlegend.get(str(s), True), marker=dict(color=colorsmap[s])), row=idx//cols+1, col=idx%cols+1)
                     fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=str(s), legendgroup=str(s), showlegend=showlegend.get(str(s), True)), row=idx//cols+1, col=idx%cols+1)
                     showlegend[str(s)] = False
 
