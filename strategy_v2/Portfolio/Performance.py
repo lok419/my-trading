@@ -17,16 +17,18 @@ class Performance(object):
 
     def performance(self, 
                     benchmark:list[str]=['^SPX'],
+                    benchmark_equal_weighted:bool=True,
                     show_all_rets: bool=True,                    
         ):        
         '''
             benchmark:       Benchmarks to compare in performance plots
             show_all_rets:   True if you want to show all sub-system return. Otherwise, only show the portfolio returns
         '''        
-        
+        # avoid modifying the default benchmark args
+        benchmark = benchmark.copy()
         all_rets = self.ret.copy()
         all_rets['Optimized Portfolio'] = self.port_ret           
-        all_rets['Rebalanced Portfolio'] = self.port_ret_rebal
+        all_rets['Rebalanced Portfolio'] = self.port_ret_rebal        
 
         # function are copied from utils.performance libs but with extra plots added        
         start_date = None
@@ -37,13 +39,17 @@ class Performance(object):
             end_date = max(all_rets[s].index.max(), start_date) if start_date is not None else all_rets[s].index.max()      
         
         if len(benchmark) > 0:        
-            for b in benchmark:            
+            for b in benchmark:                        
                 all_rets[b] = get_benchmark_return(b, start_date, end_date)
+
+        if benchmark_equal_weighted:               
+            all_rets['Equal Weighted'] = get_benchmark_return(tuple(self.instruments), start_date, end_date)
+            benchmark += ['Equal Weighted']
 
         systems_name = [str(s) for s in self.systems]
 
         # re-order the naming for convenience 
-        top_names = ['Rebalanced Portfolio', 'Optimized Portfolio'] + benchmark
+        top_names = ['Rebalanced Portfolio', 'Optimized Portfolio'] + benchmark        
         all_rets = all_rets[top_names + systems_name]
 
         display(performance_summary_table(all_rets))
@@ -123,7 +129,7 @@ class Performance(object):
             w = self.port_w[s]            
             fig.add_trace(go.Scatter(x=w.index, y=100*w, name=s, showlegend=not show_all_rets, legendgroup=s, marker=dict(color=c)), row=4, col=1)                  
 
-        instruments = self.port_position.columns
+        instruments = self.instruments     
         colors_iter = cycle(colors)        
 
         for i in instruments:
@@ -218,8 +224,7 @@ class Performance(object):
         start_date = end_date - BDay(lookback)
 
         # preserve the original orders while dropping duplicates
-        instruments = [s.instruments for s in self.systems]
-        instruments = list(dict.fromkeys(np.concatenate(instruments).tolist()))
+        instruments = self.instruments        
 
         cols = 3 
         rows = math.ceil(len(instruments) / cols)        

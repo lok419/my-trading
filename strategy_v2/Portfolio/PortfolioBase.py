@@ -95,6 +95,9 @@ class PortfolioBase(PortfolioModel, Performance):
         self.port_tc_rebal = pd.Series()
         self.logger = get_logger(self.__str__())   
 
+        # instruments across all systmes
+        self.instruments = list(dict.fromkeys([i for s in systems for i in s.instruments]))
+
     def __str__(self):        
         return self.__class__.__name__ + (f' ({self.name})' if len(self.name) else '')
 

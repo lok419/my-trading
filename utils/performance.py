@@ -97,7 +97,7 @@ def performance_summary_table(rets_dict, benchmark=[]):
     return table
 
 @cache
-def get_benchmark_return(symbol, start_date, end_date):
+def get_benchmark_return(symbol:tuple|str, start_date:datetime, end_date:datetime):
     """
         Get Return for a benchmarks from Yahoo                
     """  
@@ -105,6 +105,10 @@ def get_benchmark_return(symbol, start_date, end_date):
     px = yf.download(tickers=symbol,interval="1d", auto_adjust=True, start=start_date, end=end_date + BDay(1))
     px_close = px['Close']
     ret = px_close / px_close.shift(1) - 1
+    
+    if type(symbol) is tuple and len(symbol) > 1:
+        ret = ret.sum(axis=1)/len(symbol)
+        
     ret = ret.fillna(0)
     return ret 
 
