@@ -84,6 +84,7 @@ class Performance(object):
             xaxis12_showticklabels=True, 
             hovermode='x',            
         )
+        fig.update_layout(hoverlabel=dict(namelength=-1))
 
         colors = plotly.colors.qualitative.Plotly
         colors_iter = cycle(colors)          
@@ -192,7 +193,8 @@ class Performance(object):
             hovermode='x',            
         )
         fig.update_xaxes(showticklabels=True)
-        fig.update_xaxes(matches='x')                     
+        fig.update_xaxes(matches='x')  
+        fig.update_layout(hoverlabel=dict(namelength=-1))                   
 
         showlegend = {}
         colors = plotly.colors.qualitative.Plotly
@@ -236,6 +238,7 @@ class Performance(object):
         )
         fig.update_xaxes(showticklabels=True)
         fig.update_xaxes(matches='x') 
+        fig.update_layout(hoverlabel=dict(namelength=-1))
 
         showlegend = {}        
         colors = plotly.colors.qualitative.Plotly
@@ -248,8 +251,7 @@ class Performance(object):
                 if i in pos.columns:
                     colorsmap[s] = colorsmap[s] if s in colorsmap else next(colors_iter)
                     pos = pos[i][start_date:end_date]                    
-                    #fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=str(s), legendgroup=str(s), showlegend=showlegend.get(str(s), True), marker=dict(color=colorsmap[s])), row=idx//cols+1, col=idx%cols+1)
-                    fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=str(s), legendgroup=str(s), showlegend=showlegend.get(str(s), True)), row=idx//cols+1, col=idx%cols+1)
+                    fig.add_trace(go.Scatter(x=pos.index, y=pos*100, name=str(s), legendgroup=str(s), showlegend=showlegend.get(str(s), True), marker=dict(color=colorsmap[s])), row=idx//cols+1, col=idx%cols+1)                    
                     showlegend[str(s)] = False
 
         fig.show()

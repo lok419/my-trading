@@ -18,12 +18,20 @@ class MeanVarianceOpt(StrategyBase):
                  alpha_model:AlphaModel=ZeroAlpha(),
                  risk_model:RiskModel=ZeroCov(),
                  confidence:float=1, 
-                 opt_freq:int =1, 
+                 opt_freq:int=1, 
                  gamma:float=0.01,
-                 hhi:float=0.2,                 
-                ):        
-        if confidence > 2 or confidence < -2:
-            raise('confidence has to between -2 and 2')
+                 hhi:float=0.2,
+                 leverage:float=-1  
+                ):                
+        '''
+            alpha_model: alpha signals
+            risk_model:  covariance matrix of the instruments
+            confidence:  confidence of the mean-variance optimization. the optimized results are scaled by confidence
+            opt_freq:    optimization frequency
+            gamma:       risk aversion
+            hhi:         Herfindahl-Hirschman Index
+            leverage:    Leverage, determine the optimization constraint
+        '''
 
         self.alpha_model = alpha_model
         self.risk_model = risk_model        
@@ -31,6 +39,9 @@ class MeanVarianceOpt(StrategyBase):
         self.opt_freq = opt_freq
         self.gamma = gamma
         self.hhi = hhi
+        self.leverage = leverage
+        if self.hhi > 0:
+            assert self.leverage == 1, 'leverage must be 1 if hhi > 0'
 
         # store the historcal signals
         self.alphas = []
@@ -106,12 +117,17 @@ class MeanVarianceOpt(StrategyBase):
                 ret = 252 * expected_ret.T @ w
                 risk = 252 * cp.quad_form(w, expected_ret_cov)
 
-                constraints = []                 
-                constraints.append(cp.sum(w) <= 1)
+                constraints = []                
                 constraints.append(w <= 1)
                 constraints.append(w >= 0)
+
                 if self.hhi > 0:
                     constraints.append(cp.sum_squares(w) <= self.hhi)
+
+                if self.leverage > 0:
+                    constraints.append(cp.sum(w) == self.leverage)
+                else:
+                    constraints.append(cp.sum(w) <= 1)
                 
                 prob = cp.Problem(cp.Maximize(ret - gamma_par * risk), constraints)                            
                 prob.solve()    

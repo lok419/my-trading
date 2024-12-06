@@ -22,6 +22,6 @@ class RollingMeanCovNeg(RiskModel):
         ret = ret.tail(self.lookback)                
         assert max(ret.index) < pos_date, 'Optimization has lookahead bias'
         ret = ret.values
-        ret = np.minimum(ret, -1)
+        ret = np.minimum(ret, 0)
         ret_cov = np.cov(ret.T)         
         return ret_cov   
