@@ -1,5 +1,6 @@
 from pandas.core.frame import DataFrame
 import pandas as pd
+import numpy as np
 import yfinance as yf
 import requests
 from functools import cache
@@ -88,14 +89,28 @@ def get_yahoo_data(*args, **kwargs):
     return yf.download(*args, **kwargs)
 
 def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_date: datetime) -> DataFrame:
+    '''
+        Get Yahoo price data. Also reformat the data to mulitindex when there is only one instrument
+        Args:
+            instruments (list[str]): List of tickers
+            start_date (datetime): Start date
+            end_date (datetime): End date
+            add_cash (bool, optional): Add cash to the data. Defaults to False.
+    '''
+    instruments_wo_cash = list(np.setdiff1d(instruments, ['CASH']))
 
     # Bug from yahoo API, it doesn't include price at end_date            
-    px = get_yahoo_data(tickers=tuple(instruments), interval="1d",auto_adjust=True, start=start_date, end=add_bday(end_date, 10))
+    px = get_yahoo_data(tickers=tuple(instruments_wo_cash), interval="1d",auto_adjust=True, start=start_date, end=add_bday(end_date, 10))
     px = px.copy()
 
     # If there is only one instruments, restructure the data to include name in columns
-    if len(instruments) == 1:
-        px.columns = pd.MultiIndex.from_product([px.columns, instruments])
+    if len(instruments_wo_cash) == 1:
+        px.columns = pd.MultiIndex.from_product([px.columns, instruments_wo_cash])
+
+    # add cash separately
+    if 'CASH' in instruments:
+        for col in px.columns.get_level_values(0).unique():
+            px.loc[:, (col, 'CASH')] = 1
 
     px = px[start_date: end_date]
     return px

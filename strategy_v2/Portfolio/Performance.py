@@ -109,19 +109,23 @@ class Performance(object):
 
                 # Transaction Cost
                 if s == 'Optimized Portfolio':
-                    leverage_opt = self.port_position.sum(axis=1)          
+                    # exclude cash for leverage
+                    leverage_opt = self.port_position.loc[:, self.port_position.columns != 'CASH'].sum(axis=1)                    
                     fig.add_trace(go.Scatter(x=leverage_opt.index, y=leverage_opt*100, name=s, showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)            
                     fig.add_trace(go.Scatter(x=self.port_tc.index, y=self.port_tc.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=12, col=1)
                     
 
                 elif s == 'Rebalanced Portfolio':
-                    leverage_rebal = self.port_position_rebal_strike.sum(axis=1)
+                    # exclude cash for leverage
+                    leverage_rebal = self.port_position_rebal_strike.loc[:, self.port_position_rebal_strike.columns != 'CASH'].sum(axis=1)                                        
                     fig.add_trace(go.Scatter(x=leverage_rebal.index, y=leverage_rebal*100, name=s,showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)        
                     fig.add_trace(go.Scatter(x=self.port_tc_rebal.index, y=self.port_tc_rebal.cumsum(), name=s, showlegend=False, legendgroup=s, marker=dict(color=c)), row=12, col=1)
 
                 elif s not in benchmark:
-                    lev = self.position[s].sum(axis=1)
-                    fig.add_trace(go.Scatter(x=lev.index, y=lev*100, name=s, showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)        
+                    # exclude cash for leverage
+                    leverage_strat = self.position[s]
+                    leverage_strat = leverage_strat.loc[:, leverage_strat.columns != 'CASH'].sum(axis=1)                    
+                    fig.add_trace(go.Scatter(x=leverage_strat.index, y=leverage_strat*100, name=s, showlegend=False, legendgroup=s, marker=dict(color=c), line=dict(width=lw)), row=5, col=1)        
 
         colors_iter = cycle(colors)                
         for s in systems_name:     
