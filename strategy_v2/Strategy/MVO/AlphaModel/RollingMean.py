@@ -1,7 +1,6 @@
 from utils.logging import get_logger
 from datetime import datetime
-from strategy_v2.Strategy.MVO import AlphaModel
-from pandas.tseries.offsets import BDay
+from strategy_v2.Strategy.MVO.AlphaModelBase import AlphaModel
 import numpy as np
 
 class RollingMean(AlphaModel):
@@ -12,19 +11,25 @@ class RollingMean(AlphaModel):
     def __str__(self):
         return f'{super().__str__()}({self.lookback})'
 
+    def preprocess_data(self, data):
+        super().preprocess_data(data)
+        '''
+            Compute rolling returns as T's trading signals in advance
+        '''
+
+        ret = self.data['px']['Return']    
+
+        # T's position is based on T-1 return and before
+        df_ret = ret.shift(1)
+        df_ret = df_ret.rolling(self.lookback).mean()
+        self.df_ret = df_ret        
+        print("test")
+
     def expected_return(self, pos_date: datetime) -> np.ndarray:
         '''
             Expected return based on lookback periods
             return a array of returns
-        '''
-        ret = self.data['px']['Return']        
-        lookback_end = pos_date - BDay(1)  
-        
-        # return within lookback periods - MAKE SURE NOT LOOK AHEAD BIAS HERE
-        ret = ret[:lookback_end]
-        ret = ret.tail(self.lookback)               
+        '''        
+        expected_ret = np.array(self.df_ret.loc[:pos_date].iloc[-1])
 
-        assert max(ret.index) < pos_date, 'Optimization has lookahead bias'
-        ret = ret.values
-        expected_ret = ret.mean(axis=0)
         return expected_ret

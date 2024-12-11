@@ -1,6 +1,6 @@
 from utils.logging import get_logger
 from datetime import datetime
-from strategy_v2.Strategy.MVO import RiskModel
+from strategy_v2.Strategy.MVO.RiskModelBase import RiskModel
 from pandas.tseries.offsets import BDay
 import numpy as np
 

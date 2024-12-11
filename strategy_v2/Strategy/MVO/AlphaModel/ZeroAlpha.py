@@ -1,6 +1,6 @@
 from utils.logging import get_logger
 from datetime import datetime
-from strategy_v2.Strategy.MVO import AlphaModel
+from strategy_v2.Strategy.MVO.AlphaModelBase import AlphaModel
 from pandas.tseries.offsets import BDay
 import numpy as np
 

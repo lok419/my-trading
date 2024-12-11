@@ -1,7 +1,7 @@
 from pandas.core.api import DataFrame as DataFrame
 import numpy as np
 from datetime import datetime
-from strategy_v2.Strategy.MVO import AlphaModel
+from strategy_v2.Strategy.MVO.AlphaModelBase import AlphaModel
 from utils.logging import get_logger
 
 class MultipleAlpha(AlphaModel):      

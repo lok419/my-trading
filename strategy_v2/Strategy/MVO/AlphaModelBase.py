@@ -5,7 +5,7 @@ from pandas.core.frame import DataFrame
 import numpy as np
 
 class AlphaModel(object):
-    def __init__(self):                        
+    def __init__(self, *args, **kwargs):                        
         self.logger = get_logger(self.__class__.__name__)
     
     def __str__(self) -> str:
