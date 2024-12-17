@@ -1,7 +1,7 @@
 from pandas.core.api import DataFrame as DataFrame
 import numpy as np
 from datetime import datetime
-from strategy_v2.Strategy.MVO import AlphaModel
+from strategy_v2.Strategy.MVO.AlphaModelBase import AlphaModel
 from utils.ta import rsi
 
 
@@ -13,7 +13,14 @@ class RSI(AlphaModel):
 
             1. spot price > 200MA
             2. entry when 2-period RSI < 5
-            3. exit when price > 5MA        
+            3. exit when price > 5MA    
+
+        The signals could be accmulated when it hits the rule in conseucutive days before exit
+        e.g.
+            Day 1: RSI<10,      Signal = 0.2,  Position = 0.2 (Entry)
+            Day 2: RSI<10,      Signal = 0.3,  Position = 0.5 (Upsize)
+            Day 3: NA,          Signal = 0,    Position = 0.5 
+            Day 4: Close > 5MA, Signal = -1,   Position = 0   (Exit)    
     '''
     def __init__(self, rsi_windows=2, rsi_threshold=10):           
         self.rsi_windows = rsi_windows

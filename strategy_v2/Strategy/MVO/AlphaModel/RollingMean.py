@@ -16,14 +16,12 @@ class RollingMean(AlphaModel):
         '''
             Compute rolling returns as T's trading signals in advance
         '''
-
         ret = self.data['px']['Return']    
 
         # T's position is based on T-1 return and before
         df_ret = ret.shift(1)
         df_ret = df_ret.rolling(self.lookback).mean()
-        self.df_ret = df_ret        
-        print("test")
+        self.df_ret = df_ret                
 
     def expected_return(self, pos_date: datetime) -> np.ndarray:
         '''

@@ -67,9 +67,10 @@ class ExecutorFutu(ExecutorModel):
 
         # get target position from portfolio
         port_position_shs = self.portfolio.get_position_for_trade()
-        port_position_shs = port_position_shs.tail(1) if position_date is None else port_position_shs.loc[position_date]
+        port_position_shs = port_position_shs.tail(1) if position_date is None else pd.DataFrame(port_position_shs.loc[position_date])
         position_target = pd.DataFrame(port_position_shs.iloc[0].values, index=port_position_shs.columns, columns=['target'])
         position_target.index.name = 'instrument'   
+        position_target = position_target[position_target.index != 'CASH']
 
         position_date = port_position_shs.index[0]
         self.logger.info('Execute {} position based on {}'.format(str(self.portfolio), position_date.strftime('%Y-%m-%d')))     
@@ -79,7 +80,7 @@ class ExecutorFutu(ExecutorModel):
         symbols = [self.account.symbol_converter(x) for x in position_current['code'].values]
         shares = position_current['qty'].values        
         position_current = pd.DataFrame(shares, index=symbols, columns=['current'])
-        position_current.index.name = 'instrument'
+        position_current.index.name = 'instrument'        
         
         # compute position turnover
         position_turnover = pd.merge(position_target, position_current, on='instrument', how='left', validate='1:1')

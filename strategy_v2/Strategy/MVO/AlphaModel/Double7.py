@@ -1,7 +1,7 @@
 from pandas.core.api import DataFrame as DataFrame
 import numpy as np
 from datetime import datetime
-from strategy_v2.Strategy.MVO import AlphaModel
+from strategy_v2.Strategy.MVO.AlphaModelBase import AlphaModel
 
 
 class Double7(AlphaModel):      
@@ -10,6 +10,13 @@ class Double7(AlphaModel):
         1. stocks above 200days MA
         2. entry when closes at 7days low 
         3. exit when closes at 7days high     
+
+        The signals could be accmulated when it hits the rule in conseucutive days before exit
+        e.g.
+            Day 1: 7D Low,  Signal = 0.2,  Position = 0.2 (Entry)
+            Day 2: 7D Low,  Signal = 0.3,  Position = 0.5 (Upsize)
+            Day 3: NA,      Signal = 0,    Position = 0.5 
+            Day 4: 7D High, Signal = -1,   Position = 0   (Exit)
     '''
     def __init__(self, periods:int=7):
         self.periods = periods
@@ -30,6 +37,7 @@ class Double7(AlphaModel):
         df_7d_high = df_close.rolling(self.periods).max()
         df_ret = df_close.pct_change().rolling(self.periods).mean().abs().clip(0, 1)
 
+        # use average return as size of signals        
         df_entry = df_ret * ((df_close == df_7d_low) & (df_close > df_200ma))
         df_exit = -1 * ((df_close == df_7d_high) | (df_close < df_200ma))
 
