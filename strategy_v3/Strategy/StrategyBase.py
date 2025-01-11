@@ -17,7 +17,6 @@ import random
 import traceback
 import os
 
-
 class StrategyBase(StrategyModel):    
 
     def __init__(self, 
@@ -179,9 +178,6 @@ class StrategyBase(StrategyModel):
 
     def execute(self, data):
         pass    
-
-    def run(self):
-        pass
 
     def close_out_positions(self,                                                         
                             type:str = 'close',

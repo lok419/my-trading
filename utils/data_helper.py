@@ -4,6 +4,8 @@ from functools import cache
 import pandas_market_calendars as mcal
 import pandas as pd
 import pytz
+import numpy as np
+import math
 
 def bucketize(arr, bucket_size):
     output = []
@@ -40,6 +42,16 @@ def get_today(offset=0, tz='US/Eastern', market='NYSE'):
 
 def title_case(x):
     return x.title().replace('_', ' ')
+
+def count_digit(x: str) -> int:    
+    try:
+        return len(np.format_float_positional(float(x), trim='-').split('.')[1])            
+    except:
+        return 0   
+    
+def round_down(number, decimal_places):
+    factor = 10 ** decimal_places
+    return math.floor(number * factor) / factor
 
 if __name__ == "__main__":    
     hols = trading_holidays()
