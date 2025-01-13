@@ -163,6 +163,7 @@ cython_debug/
 *.h5
 *.csv
 *.pl
+*.db
 /strategy_v3/execute.json
 catboost_info*
 
