@@ -1,5 +1,5 @@
 from strategy_v3.ExecuteSetup import ExecuteSetup
-from strategy_v3.Strategy import GridArithmeticStrategy, SimpleMarketMakingStrategy, MeanRevertRSIStrategy, StrategyModel
+from strategy_v3.Strategy import GridArithmeticStrategy, SimpleMarketMakingStrategy, MeanRevertRSIStrategy, ExchangeArbitrageStrategy, StrategyModel
 
 CONFIG_PATH = "strategy_v3/execute.json"
 

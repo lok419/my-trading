@@ -135,7 +135,8 @@ class StrategyBase(StrategyModel):
         self.data_loader = data_loader
 
     def set_strategy_id(self, 
-                        strategy_id :str,                        
+                        strategy_id :str,     
+                        **kwargs,                   
                         ):
         '''
             Set strategy id. this is used to identify the orders from same strategy instance

@@ -4,4 +4,5 @@ from .StrategyBase import StrategyBase
 from .GridArithmeticStrategy import GridArithmeticStrategy
 from .SimpleMarketMakingStrategy import SimpleMarketMakingStrategy
 from .MeanRevertRSIStrategy import MeanRevertRSIStrategy
+from .ExchangeArbitrageStrategy import ExchangeArbitrageStrategy
 
