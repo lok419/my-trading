@@ -228,6 +228,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_pnl['gross_pnl%'] = (df_pnl['gross_pnl%'] - 1)*100
         df_pnl['net_pnl%'] = (df_pnl['net_pnl%'] - 1)*100
         df_pnl = df_pnl.sort_values('net_pnl%', ascending=False)
+        self.df_pnl = df_pnl
         self.logger.info(f"\n{tabulate(df_pnl, headers='keys', tablefmt='psql')}")        
     
     def execute(self, *args, **kwargs):
