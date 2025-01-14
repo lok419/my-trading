@@ -5,7 +5,7 @@ import warnings
 import cvxpy as cp
 import os
 import random
-from utils.db import sqlite
+from utils.db import duck
 from utils.logging import get_logger
 from utils.data_helper import *
 from strategy_v3.Strategy import StrategyModel
@@ -41,14 +41,14 @@ class ExchangeArbitrageStrategy(StrategyModel):
         assert self.trades_num == -1 or self.trades_num >= 2, "trades_num must be >= 2"
 
     def __str__(self):
-        return 'exch_arb_{}'.format(self.strategy_id)
+        return self.strategy_id
     
     def set_strategy_id(self, strategy_id: str, **kargs):
         self.strategy_id = strategy_id
         self.logger.name = self.__str__()
 
         # path for logging and pnl records                  
-        self.db = sqlite('{}.db'.format(self.__str__()))            
+        self.db = duck('{}'.format(self.__str__()))            
         
     def set_data_loder(self, *args, **kwargs):
         pass
@@ -176,6 +176,11 @@ class ExchangeArbitrageStrategy(StrategyModel):
                     'fee': self.fee_matrix[from_idx][to_idx]
                 }
 
+        # in case no optimal trades, return False
+        if len(trades) == 0:
+            self.logger.info("No optimal trades found, end here.") 
+            return False
+
         # 2b. seggregate the arbitrage trades into groups (optimization can returns more than one closed loops)
         visited = set()
         group_num = 1
@@ -212,10 +217,11 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_trades['side'] = np.where(df_trades['to_asset'] == df_trades['baseAsset'], 'BUY', 'SELL')
         df_trades['count'] = 1        
         df_trades['price_time'] = self.price_time
+        df_trades['zero_fees'] = self.zero_fees        
         self.df_trades = df_trades        
 
         # save the trades for reference        
-        self.db.insert('trades', df_trades)
+        self.db.insert('trades', df_trades, append_new_column=True)
 
         df_pnl = df_trades.groupby(['group']).agg({'mkt_price': 'prod', 'mkt_price_w_fee': 'prod', 'count': 'sum'})
         df_pnl.columns = ['gross_pnl%', 'net_pnl%', 'count']

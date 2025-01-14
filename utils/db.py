@@ -72,7 +72,7 @@ class sqlite(dbconn):
 class duck(dbconn):
 
     def __init__(self, database):
-        self.database = f"data/sqlite/{database}.db"
+        self.database = f"data/duckdb/{database}.db"
 
     def query(self, sql_query: str) -> DataFrame:
         try:

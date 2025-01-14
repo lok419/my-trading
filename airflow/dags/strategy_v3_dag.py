@@ -58,11 +58,17 @@ with DAG(
     start_date=datetime(2025, 1, 14),
     catchup=False,
 ) as dag:
-
-    # run
-    run = PythonOperator(
-        task_id="run_strategy",
+    
+    PythonOperator(
+        task_id="binance_arb",
         python_callable=execute,
-        op_args=['BinArb_v1'],
+        op_args=['binance_arb'],
+        dag=dag
+    )
+    
+    PythonOperator(
+        task_id="binance_arb_zero_fees",
+        python_callable=execute,
+        op_args=['binance_arb_zero_fees'],
         dag=dag
     )  
