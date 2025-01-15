@@ -39,6 +39,12 @@ class ExchangeArbitrageStrategy(StrategyModel):
         self.zero_fees = zero_fees
         self.trades_num = trades_num
         assert self.trades_num == -1 or self.trades_num >= 2, "trades_num must be >= 2"
+        self.trade_currency = {
+            'USDT': 50,
+            'ETH':  0.01539456264,
+            'BTC': 0.00052979531,
+        }
+        self.logger.info(self.trade_currency)
 
     def __str__(self):
         return self.strategy_id
@@ -121,7 +127,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         np.fill_diagonal(self.quote_matrix_ln, 0)      
 
-    def optimize(self): 
+    def optimize(self) -> bool: 
         ''' 
             Generate optimal arbitrage trades
         '''        
@@ -159,9 +165,9 @@ class ExchangeArbitrageStrategy(StrategyModel):
                b. seggregate all arbitrage trades per closed loops (optimization can returns more than one closed loops)
         '''
 
-        value = self.opt_path * self.quote_matrix * (1 - self.fee_matrix)
-        value = np.prod(value[value != 0])
-        self.logger.info(f"Total PNL: {100*(value-1):.4f}%")        
+        total_pnl = self.opt_path * self.quote_matrix * (1 - self.fee_matrix)
+        total_pnl = np.prod(total_pnl[total_pnl != 0]) - 1
+        self.logger.info(f"Total PNL: {100*(total_pnl):.4f}%")        
 
         # 2a. First identify all arbitrage trades
         trades = {}
@@ -180,6 +186,10 @@ class ExchangeArbitrageStrategy(StrategyModel):
         if len(trades) == 0:
             self.logger.info("No optimal trades found, end here.") 
             return False
+        
+        if 100 * total_pnl < 0.001:
+            self.logger.info("PnL is too small, end here.")
+            return False        
 
         # 2b. seggregate the arbitrage trades into groups (optimization can returns more than one closed loops)
         visited = set()
@@ -230,16 +240,120 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_pnl = df_pnl.sort_values('net_pnl%', ascending=False)
         self.df_pnl = df_pnl
         self.logger.info(f"\n{tabulate(df_pnl, headers='keys', tablefmt='psql')}")        
+
+        return True
     
-    def execute(self, *args, **kwargs):
-        pass
+    def execute(self, *args, **kwargs):        
+        if self.zero_fees:
+            self.logger.log('Do not execute the trades given zero_fees assumptions.')
+            return
+        
+        # Trade the First Group For Now
+        df_trades = self.df_trades
+        df_pnl = self.df_pnl
+        trades = df_trades[df_trades['group'] == df_pnl.index[0]]
+
+        # reorder the trades to start with one of the trade currency
+        start_ccys = [x for x in self.trade_currency if x in trades['from_asset'].to_list()]
+        if len(start_ccys) == 0:
+            self.logger.info('No trade currency found')
+            return
+
+        start_ccy = start_ccys[0]
+        start_order = trades[trades['from_asset'] == start_ccy].iloc[0]['order']
+        trades['order'] = (trades['order'] - start_order) % len(trades) + 1
+        trades = trades.sort_values('order').reset_index(drop=True)
+
+        # sanity check
+        assert trades.iloc[0]['from_asset'] == start_ccy
+        assert trades.iloc[-1]['to_asset'] == start_ccy
+
+        trade_orders = []
+
+        # execute the trades via market orders
+        for i, row in trades.iterrows():
+            symbol = row['symbol']
+            side = row['side']
+            from_asset = row['from_asset']
+            to_asset = row['to_asset']    
+
+            baseAsset = row['baseAsset']
+            baseAsset_decimal = row['qty_decimal']
+            quoteAsset_decimal = row['price_decimal']            
+
+            # Rules:
+            # 1. First trade are based on pre-set amounts under self.trade_currency
+            # 2. qty is based on from_asset
+            if i == 0:            
+                from_asset_qty = self.trade_currency[from_asset]        
+            
+            order_params = {
+                'symbol': symbol,
+                'side': side,
+                'type':'MARKET'
+            }
+
+            # round_down to make sure we don't sell more than holding balances
+            if from_asset == baseAsset:
+                order_params['quantity'] = round_down(from_asset_qty, baseAsset_decimal)
+            else:
+                order_params['quoteOrderQty'] = round_down(from_asset_qty, quoteAsset_decimal)
+            
+            order = self.client.create_order(**order_params)                    
+            self.logger.info(f'Created Market Order: {order_params}')
+            
+            if order['status'] == 'FILLED':   
+                # find net received asset given current fills, therefore, from_asset_qty will be used for trade in next iteration
+                from_asset_qty = 0
+                for fill in order['fills']:
+                    if to_asset == baseAsset:
+                        from_asset_qty += float(fill['qty'])
+                    else:
+                        from_asset_qty += float(fill['qty']) * float(fill['price'])
+
+                    # subtract out comission to get net received quantity, comission is always quoted in received asset
+                    if 'commission' in fill and to_asset == fill['commissionAsset']:
+                        from_asset_qty -= float(fill['commission'])
+
+                trade_orders.append(order)                
+            else:
+                raise Exception('order not filled yet!')   
+
+        df_orders = pd.DataFrame(trade_orders).drop(columns=['fills'])
+        df_orders = df_orders.rename(columns={'side': 'order_side'})
+
+        df_fills = pd.DataFrame([dict({'symbol': x['symbol']},**y) for x in trade_orders for y in x['fills']])
+        df_fills = df_fills.rename(columns={'price': 'fill_price', 'qty': 'fill_qty'})
+        df_fills['fill_price'] = df_fills['fill_price'].astype(float)
+        df_fills['fill_qty'] = df_fills['fill_qty'].astype(float)
+        df_fills['commission'] = df_fills['commission'].astype(float)
+
+        df_orders = pd.merge(df_orders, df_fills, how='left', on=['symbol'], validate='1:m')
+        df_orders = df_orders.rename(columns={'status': 'fill_status'})
+        df_orders = pd.merge(trades, df_orders, how='left', on=['symbol'], validate='1:m')
+
+        df_orders['from_asset_qty'] = df_orders.apply(lambda x: x['fill_qty'] if x['from_asset'] == x['baseAsset'] else x['fill_qty'] * x['fill_price'], axis=1)
+        df_orders['to_asset_gross_qty'] = df_orders.apply(lambda x: x['fill_qty'] if x['to_asset'] == x['baseAsset'] else x['fill_qty'] * x['fill_price'], axis=1)
+        df_orders['to_asset_comms_qty'] = df_orders.apply(lambda x: x['commission'] if x['to_asset'] == x['commissionAsset'] else 0, axis=1)
+        df_orders['to_asset_qty'] = df_orders['to_asset_gross_qty'] - df_orders['to_asset_comms_qty']
+        self.df_orders = df_orders
+
+        # save the trades for reference        
+        self.db.insert('orders', df_orders, append_new_column=True)        
+
+        df_orders_agg = df_orders.groupby(['group', 'order', 'from_asset']).sum(numeric_only=True).reset_index()
+        df_orders_agg = df_orders_agg.groupby(['group']).agg({'from_asset': 'first', 'from_asset_qty': 'first', 'to_asset_qty': 'last'})
+        df_orders_agg['net_qty'] = df_orders_agg['to_asset_qty'] - df_orders_agg['from_asset_qty']
+        self.df_orders_agg = df_orders_agg        
+        self.logger.info(f"\n{tabulate(df_orders_agg, headers='keys', tablefmt='psql')}")                
     
     def run(self, *args, **kwargs):
         pass
     
     def run_once(self, *args, **kwargs):
-        self.load_data()                
-        self.optimize()        
+        self.load_data()                        
+        if self.optimize():
+            self.execute()
     
     def cancel_all_orders(self):
         pass
