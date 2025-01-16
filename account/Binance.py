@@ -389,4 +389,27 @@ class Binance(AccountModel):
         df_trades_ask = trades[trades['isBuyerMaker'] == False]
 
         return df_trades_bid, df_trades_ask
-        
+    
+    def format_output(df: DataFrame) -> DataFrame:
+        '''
+            Format Binance output to convert 
+            - strings (e.g. price, qty, size) to float
+            - integer time to timestamp
+            - integer id to string
+        '''
+        types = df.dtypes
+        str2float = list(types[types == 'object'].index)
+        str2float = [x for x in str2float if any(k.lower() in x.lower() for k in ['qty', 'price', 'size'])]
+        df[str2float] = df[str2float].astype(float)
+
+        int2str = list(types[types == 'int64'].index)
+        int2str = [x for x in int2str if any(k.lower() in x.lower() for k in ['id'])]
+        df[int2str] = df[int2str].astype(str)   
+
+        int2time = list(types[types == 'int64'].index)
+        int2time = [x for x in int2time if any(k.lower() in x.lower() for k in ['time'])]
+
+        for x in int2time:
+            df[x] = pd.to_datetime(df[x], unit='ms').dt.tz_localize('UTC').dt.tz_convert('HongKong')
+
+        return df        

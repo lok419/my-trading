@@ -97,8 +97,16 @@ class duck(dbconn):
                     for col in new_cols:
                         alter_sql = f"ALTER TABLE {table} ADD COLUMN {col} {duckdb_type[str(data.dtypes[col])]}" 
                         print(alter_sql)
-                        self.query(alter_sql)             
-                    data.to_sql(table, conn, if_exists='append', index=False)                
+                        self.query(alter_sql)                                     
+
+                    try:
+                        data.to_sql(table, conn, if_exists='append', index=False)                        
+                    except Exception as e:
+                        raise Exception(e)
+                else:
+                    raise Exception(e)
+            else:
+                raise Exception(e)
         finally:
             conn.close()
 

@@ -185,11 +185,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         # in case no optimal trades, return False
         if len(trades) == 0:
             self.logger.info("No optimal trades found, end here.") 
-            return False
-        
-        if 100 * total_pnl < 0.001:
-            self.logger.info("PnL is too small, end here.")
-            return False        
+            return False                
 
         # 2b. seggregate the arbitrage trades into groups (optimization can returns more than one closed loops)
         visited = set()
@@ -228,6 +224,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_trades['count'] = 1        
         df_trades['price_time'] = self.price_time
         df_trades['zero_fees'] = self.zero_fees        
+        df_trades = Binance.format_output(df_trades)
         self.df_trades = df_trades        
 
         # save the trades for reference        
@@ -241,11 +238,15 @@ class ExchangeArbitrageStrategy(StrategyModel):
         self.df_pnl = df_pnl
         self.logger.info(f"\n{tabulate(df_pnl, headers='keys', tablefmt='psql')}")        
 
+        if 100 * total_pnl < 0.001:
+            self.logger.info("Net pnl is too small, end here.")
+            return False        
+
         return True
     
-    def execute(self, *args, **kwargs):        
-        if self.zero_fees:
-            self.logger.log('Do not execute the trades given zero_fees assumptions.')
+    def execute(self, force=False, *args, **kwargs):        
+        if self.zero_fees and not force:
+            self.logger.info('Do not execute the trades given zero_fees assumptions.')
             return
         
         # Trade the First Group For Now
@@ -295,9 +296,9 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
             # round_down to make sure we don't sell more than holding balances
             if from_asset == baseAsset:
-                order_params['quantity'] = round_down(from_asset_qty, baseAsset_decimal)
+                order_params['quantity'] = np.format_float_positional(round_down(from_asset_qty, baseAsset_decimal), trim='-')
             else:
-                order_params['quoteOrderQty'] = round_down(from_asset_qty, quoteAsset_decimal)
+                order_params['quoteOrderQty'] = np.format_float_positional(round_down(from_asset_qty, quoteAsset_decimal), trim='-')
             
             order = self.client.create_order(**order_params)                    
             self.logger.info(f'Created Market Order: {order_params}')
@@ -336,6 +337,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_orders['to_asset_gross_qty'] = df_orders.apply(lambda x: x['fill_qty'] if x['to_asset'] == x['baseAsset'] else x['fill_qty'] * x['fill_price'], axis=1)
         df_orders['to_asset_comms_qty'] = df_orders.apply(lambda x: x['commission'] if x['to_asset'] == x['commissionAsset'] else 0, axis=1)
         df_orders['to_asset_qty'] = df_orders['to_asset_gross_qty'] - df_orders['to_asset_comms_qty']
+        df_orders = Binance.format_output(df_orders)
         self.df_orders = df_orders
 
         # save the trades for reference        
