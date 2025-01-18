@@ -71,20 +71,28 @@ class sqlite(dbconn):
 
 class duck(dbconn):
 
-    def __init__(self, database):
-        self.database = f"data/duckdb/{database}.db"
+    def __init__(self, database=None):
+        if database is not None:
+            self.database = f"data/duckdb/{database}.db"
+        else:
+            self.database = None
+
+    def get_conn(self):        
+        return duckdb.connect(database=self.database, read_only=False) if self.database is not None else duckdb.connect(read_only=False)
 
     def query(self, sql_query: str) -> DataFrame:
         try:
-            conn = duckdb.connect(database=self.database, read_only=False)
+            conn = self.get_conn()
             df = conn.execute(sql_query).fetchdf()
             return df
+        except Exception as e:
+            raise e
         finally:
             conn.close()                
 
     def insert(self, table, data: DataFrame, append_new_column=False):
         try:
-            conn = duckdb.connect(database=self.database, read_only=False)
+            conn = self.get_conn()
             data.to_sql(table, conn, if_exists='append', index=False)
         except Exception as e:
             '''

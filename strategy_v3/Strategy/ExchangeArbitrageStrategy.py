@@ -20,14 +20,18 @@ warnings.filterwarnings('ignore')
 class ExchangeArbitrageStrategy(StrategyModel):    
 
     def __init__(self,                 
-                zero_fees = False, 
-                interval = 30,
-                trades_num = -1,                
+                zero_fees = False,                 
+                max_trades = -1,          
+                min_pnl = 50,      
         ):
+        '''
+            zero_fees: set to True if you want to use zero fees
+            max_trades: set to -1 for unlimited trades
+            min_pnl: minimum pnl to start a trade, represented in bps
+        '''
 
         # strategy_id is used to identify the strategy from list of orders
-        self.strategy_id = str(round(random.random() * 1e6))
-        self.interval = interval        
+        self.strategy_id = str(round(random.random() * 1e6))            
         self.logger = get_logger(self.__str__())
 
         # init all symbols fundemental data (only need to load once)        
@@ -37,8 +41,14 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         # strategy setup        
         self.zero_fees = zero_fees
-        self.trades_num = trades_num
-        assert self.trades_num == -1 or self.trades_num >= 2, "trades_num must be >= 2"
+        self.max_trades = max_trades
+        self.min_pnl = min_pnl
+
+        self.logger.info(f"zero_fees: {self.zero_fees}")
+        self.logger.info(f"max_trades: {self.max_trades}")
+        self.logger.info(f"min_pnl: {self.min_pnl}bps")
+
+        assert self.max_trades == -1 or self.max_trades >= 2, "max_trades must be >= 2"
         self.trade_currency = {
             'USDT': 50,
             'ETH':  0.01539456264,
@@ -144,8 +154,8 @@ class ExchangeArbitrageStrategy(StrategyModel):
             X.T @ ones == ones,                    
         ]
 
-        if self.trades_num > 0:
-            constraints.append(cp.sum(X) - cp.sum(cp.diag(X)) <= self.trades_num)
+        if self.max_trades > 0:
+            constraints.append(cp.sum(X) - cp.sum(cp.diag(X)) <= self.max_trades)
 
         # Form objective.
         obj = cp.Minimize(cp.sum(cp.multiply(X, self.quote_matrix_ln)))
@@ -167,7 +177,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         total_pnl = self.opt_path * self.quote_matrix * (1 - self.fee_matrix)
         total_pnl = np.prod(total_pnl[total_pnl != 0]) - 1
-        self.logger.info(f"Total PNL: {100*(total_pnl):.4f}%")        
+        self.logger.info(f"Total PNL: {10000*(total_pnl):.2f}bps")        
 
         # 2a. First identify all arbitrage trades
         trades = {}
@@ -230,16 +240,16 @@ class ExchangeArbitrageStrategy(StrategyModel):
         # save the trades for reference        
         self.db.insert('trades', df_trades, append_new_column=True)
 
-        df_pnl = df_trades.groupby(['group']).agg({'mkt_price': 'prod', 'mkt_price_w_fee': 'prod', 'count': 'sum'})
-        df_pnl.columns = ['gross_pnl%', 'net_pnl%', 'count']
-        df_pnl['gross_pnl%'] = (df_pnl['gross_pnl%'] - 1)*100
-        df_pnl['net_pnl%'] = (df_pnl['net_pnl%'] - 1)*100
-        df_pnl = df_pnl.sort_values('net_pnl%', ascending=False)
+        df_pnl = df_trades.groupby(['group']).agg({'mkt_price': 'prod', 'mkt_price_w_fee': 'prod', 'count': 'sum'})        
+        df_pnl.columns = ['gross_pnl_bps', 'net_pnl_bps', 'count']
+        df_pnl['gross_pnl_bps'] = (df_pnl['gross_pnl_bps'] - 1)*10000
+        df_pnl['net_pnl_bps'] = (df_pnl['net_pnl_bps'] - 1)*10000
+        df_pnl = df_pnl.sort_values('net_pnl_bps', ascending=False)
         self.df_pnl = df_pnl
         self.logger.info(f"\n{tabulate(df_pnl, headers='keys', tablefmt='psql')}")        
 
-        if 100 * total_pnl < 0.001:
-            self.logger.info("Net pnl is too small, end here.")
+        if 10000 * total_pnl < self.min_pnl:
+            self.logger.info(f"Net pnl is smaller than min_pnl ({self.min_pnl}bps). end here.")
             return False        
 
         return True
