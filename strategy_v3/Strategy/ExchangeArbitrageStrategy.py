@@ -64,7 +64,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         self.logger.name = self.__str__()
 
         # path for logging and pnl records                  
-        self.db = duck('{}'.format(self.__str__()))            
+        self.db = duck('{}'.format(self.__str__()), read_only=False)            
         
     def set_data_loder(self, *args, **kwargs):
         pass

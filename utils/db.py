@@ -38,8 +38,7 @@ class dbconn(object):
 
 class sqlite(dbconn):
     def __init__(self, database):
-        self.database = f"data/sqlite/{database}.db"
-        pass
+        self.database = f"data/sqlite/{database}.db"        
 
     def query(self, sql_query: str) -> DataFrame:
         try:
@@ -71,14 +70,20 @@ class sqlite(dbconn):
 
 class duck(dbconn):
 
-    def __init__(self, database=None):
+    def __init__(self, database=None, read_only=True):
+        '''
+            database: str:   file path of the database object
+            read_only: bool: read only mode, default true
+        '''
+        
+        self.read_only = read_only
         if database is not None:
             self.database = f"data/duckdb/{database}.db"
         else:
             self.database = None
 
     def get_conn(self):        
-        return duckdb.connect(database=self.database, read_only=False) if self.database is not None else duckdb.connect(read_only=False)
+        return duckdb.connect(database=self.database, read_only=self.read_only) if self.database is not None else duckdb.connect(read_only=self.read_only)
 
     def query(self, sql_query: str) -> DataFrame:
         try:
