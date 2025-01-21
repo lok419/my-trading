@@ -8,6 +8,7 @@ import random
 from utils.db import duck
 from utils.logging import get_logger
 from utils.data_helper import *
+from utils.ccy import ExchangeRateGraph
 from strategy_v3.Strategy import StrategyModel
 from account import Binance
 from tabulate import tabulate
@@ -98,6 +99,21 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_symbols = pd.merge(df_symbols, self.fees, how='left', on='symbol', validate='1:1')
         df_symbols['makerCommission'] = df_symbols['makerCommission'].fillna(0)
         df_symbols['takerCommission'] = df_symbols['takerCommission'].fillna(0)
+        df_symbols = Binance.format_output(df_symbols)
+
+        # Get USDT Price for all currencies
+        G = ExchangeRateGraph()
+        for _, row in df_symbols.iterrows():
+            baseAsset = row['baseAsset']
+            quoteAsset = row['quoteAsset']
+            bidPrice = float(row['bidPrice'])
+            askPrice = float(row['askPrice'])
+            midPrice = (bidPrice + askPrice) / 2        
+            G.add_edge(baseAsset, quoteAsset, midPrice)
+            G.add_edge(quoteAsset, baseAsset, 1/midPrice)
+
+        self.usd_price = G.get_all_rates('USDT')
+        df_symbols['usd_price'] = df_symbols['baseAsset'].map(self.usd_price)
         self.df_symbols = df_symbols
 
         # Create quote matrix for optimization
@@ -229,7 +245,14 @@ class ExchangeArbitrageStrategy(StrategyModel):
         df_trades = df_trades.sort_values(by=['group', 'order'])
         df_trades['mkt_price_w_fee'] = df_trades['mkt_price'] * (1-df_trades['fee'])
         df_trades['symbol'] = df_trades.apply(lambda x: x['from_asset'] + x['to_asset'] if x['from_asset'] + x['to_asset'] in self.df_symbols['symbol'].unique() else x['to_asset'] + x['from_asset'], axis=1)
-        df_trades = pd.merge(df_trades, self.df_symbols, how='left', on='symbol', validate='1:1')
+
+        # print error to debug unknwon join error
+        try:
+            df_trades = pd.merge(df_trades, self.df_symbols, how='left', on='symbol', validate='1:1')
+        except Exception as e:
+            self.logger.error(f"\n{tabulate(df_trades, headers='keys', tablefmt='psql')}")        
+            raise(e)
+
         df_trades['side'] = np.where(df_trades['to_asset'] == df_trades['baseAsset'], 'BUY', 'SELL')
         df_trades['count'] = 1        
         df_trades['price_time'] = self.price_time
