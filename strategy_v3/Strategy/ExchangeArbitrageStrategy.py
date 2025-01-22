@@ -135,7 +135,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         removal = df_symbols[(df_symbols['bid_tradable'] == False) & (df_symbols['ask_tradable'] == False)]
         df_symbols = df_symbols[~((df_symbols['bid_tradable'] == False) & (df_symbols['ask_tradable'] == False))]
 
-        self.logger.info(f"Removed {len(removal)} symbols givne both bid/ask are non-tradable (<${self.bid_ask_min_usd})")
+        self.logger.info(f"Removed {len(removal)} out of {len(df_symbols)+ len(removal)} symbols given both bid/ask are non-tradable <${self.bid_ask_min_usd}")
         self.df_symbols = df_symbols
 
         # Create quote matrix for optimization
@@ -214,7 +214,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         prob = cp.Problem(obj, constraints)
         prob.solve(verbose=True)
         self.logger.info(f"CVXPY - Status: {prob.status}")
-        self.logger.info(f"CVSPY - Optimal value: {prob.value}")
+        self.logger.info(f"CVXPY - Optimal value: {prob.value}")
 
         # avoid some weird rounding
         self.opt_path = X.value.round(2)
