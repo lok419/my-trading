@@ -21,14 +21,18 @@ warnings.filterwarnings('ignore')
 class ExchangeArbitrageStrategy(StrategyModel):    
 
     def __init__(self,                 
-                zero_fees = False,                 
+                zero_fees = False,     
+                trade_size = 50,       
+                bid_ask_min = 2,     
                 max_trades = -1,          
                 min_pnl = 50,      
         ):
         '''
-            zero_fees: set to True if you want to use zero fees
-            max_trades: set to -1 for unlimited trades
-            min_pnl: minimum pnl to start a trade, represented in bps
+            zero_fees:      set to True if you want to use zero fees
+            trade_size:     arb trade size in USD
+            bid_ask_min:    minimum order size for current best bid and ask quote, this is represented in multiple of trade_size
+            max_trades:     set to -1 for unlimited trades
+            min_pnl:        minimum pnl in bps to start a trade
         '''
 
         # strategy_id is used to identify the strategy from list of orders
@@ -38,24 +42,23 @@ class ExchangeArbitrageStrategy(StrategyModel):
         # init all symbols fundemental data (only need to load once)        
         self.client = Binance().get_client()
         self.exch_info = self.client.get_exchange_info()
-        self.fees = Binance().get_trading_fee()        
+        self.fees = Binance().get_trading_fee()                
 
         # strategy setup        
         self.zero_fees = zero_fees
         self.max_trades = max_trades
         self.min_pnl = min_pnl
+        self.trade_size = trade_size
+        self.bid_ask_min = bid_ask_min
+        self.bid_ask_min_usd = self.trade_size * self.bid_ask_min
 
+        self.logger.info(f"trade_size: {self.trade_size}")
+        self.logger.info(f"bid_ask_min: {self.bid_ask_min} (${self.bid_ask_min_usd})")
         self.logger.info(f"zero_fees: {self.zero_fees}")
         self.logger.info(f"max_trades: {self.max_trades}")
         self.logger.info(f"min_pnl: {self.min_pnl}bps")
-
         assert self.max_trades == -1 or self.max_trades >= 2, "max_trades must be >= 2"
-        self.trade_currency = {
-            'USDT': 50,
-            'ETH':  0.01539456264,
-            'BTC': 0.00052979531,
-        }
-        self.logger.info(self.trade_currency)
+
 
     def __str__(self):
         return self.strategy_id
@@ -76,11 +79,13 @@ class ExchangeArbitrageStrategy(StrategyModel):
     def load_data(self):
         '''
             Load up all prices data and create quote matrix for optimization
+            1. Get all binance price and symbols basis data
+            2. Calculate the quantity of trade ccy
+            3. Get all ccy to usd conversion rate, then remove all bid-ask then are below the min bid-ask size
+            4. Construct a quote matrix for optimization
         '''
-
         price = self.client.get_orderbook_tickers()
         self.price_time = pd.to_datetime(datetime.now(tz=ZoneInfo('HongKong')))
-
 
         df_symbols = pd.DataFrame(self.exch_info['symbols'])
         df_symbols = df_symbols[['symbol', 'status', 'baseAsset', 'quoteAsset']]
@@ -93,27 +98,44 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         df_symbols['qty_decimal'] = df_symbols['stepSize'].apply(count_digit)
         df_symbols['price_decimal'] = df_symbols['tickSize'].apply(count_digit)
-
+        
         df_price = pd.DataFrame(price)
         df_symbols = pd.merge(df_symbols, df_price, how='left', on='symbol', validate='1:1')
         df_symbols = pd.merge(df_symbols, self.fees, how='left', on='symbol', validate='1:1')
         df_symbols['makerCommission'] = df_symbols['makerCommission'].fillna(0)
-        df_symbols['takerCommission'] = df_symbols['takerCommission'].fillna(0)
+        df_symbols['takerCommission'] = df_symbols['takerCommission'].fillna(0)        
         df_symbols = Binance.format_output(df_symbols)
+        df_symbols['midPrice'] = (df_symbols['bidPrice'] + df_symbols['askPrice']) / 2
+
+        # Given the market price, this determine the trade size for each predefined currency in wallet
+        self.trade_currency = {
+            'USDT': self.trade_size,
+            'ETH':  self.trade_size / float(df_symbols[df_symbols['symbol'] == 'BTCUSDT'].iloc[0]['midPrice']),
+            'BTC':  self.trade_size / float(df_symbols[df_symbols['symbol'] == 'ETHUSDT'].iloc[0]['midPrice']),
+        }
+        self.logger.info(self.trade_currency)
 
         # Get USDT Price for all currencies
         G = ExchangeRateGraph()
         for _, row in df_symbols.iterrows():
             baseAsset = row['baseAsset']
             quoteAsset = row['quoteAsset']
-            bidPrice = float(row['bidPrice'])
-            askPrice = float(row['askPrice'])
-            midPrice = (bidPrice + askPrice) / 2        
+            midPrice = float(row['midPrice'])
             G.add_edge(baseAsset, quoteAsset, midPrice)
             G.add_edge(quoteAsset, baseAsset, 1/midPrice)
 
         self.usd_price = G.get_all_rates('USDT')
         df_symbols['usd_price'] = df_symbols['baseAsset'].map(self.usd_price)
+        df_symbols['bid_size'] = df_symbols['bidQty'] * df_symbols['usd_price']
+        df_symbols['ask_size'] = df_symbols['askQty'] * df_symbols['usd_price']
+        df_symbols['bid_tradable'] = df_symbols['bid_size'] >= self.bid_ask_min_usd
+        df_symbols['ask_tradable'] = df_symbols['ask_size'] >= self.bid_ask_min_usd
+
+        # remove if both are untradable to remove the quote matrix size
+        removal = df_symbols[(df_symbols['bid_tradable'] == False) & (df_symbols['ask_tradable'] == False)]
+        df_symbols = df_symbols[~((df_symbols['bid_tradable'] == False) & (df_symbols['ask_tradable'] == False))]
+
+        self.logger.info(f"Removed {len(removal)} symbols givne both bid/ask are non-tradable (<${self.bid_ask_min_usd})")
         self.df_symbols = df_symbols
 
         # Create quote matrix for optimization
@@ -121,6 +143,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
         self.assets = sorted(list(set(self.df_symbols['baseAsset'].to_list() + self.df_symbols['quoteAsset'].to_list())))
         self.quote_matrix = np.ones((len(self.assets), len(self.assets)))
         self.fee_matrix = np.zeros((len(self.assets), len(self.assets)))
+        skip_count = 0
 
         for _, row in self.df_symbols.iterrows():
             baseAsset = row['baseAsset']
@@ -132,16 +155,28 @@ class ExchangeArbitrageStrategy(StrategyModel):
             # market orders follows taker fee    
             takerFee = float(row['takerCommission'])
 
+            # bid/ask are tradable, if not tradable, do not fill the matrix
+            bid_tradable = row['bid_tradable']
+            ask_tradable = row['ask_tradable']
+
             base_idx = self.assets.index(baseAsset)
             quote_idx = self.assets.index(quoteAsset)
 
             # sell one unit of base currency to buy quote currency
-            self.quote_matrix[base_idx][quote_idx] = bidPrice
-                        
-            # sell one unti of quote currency to buy base currency
-            self.quote_matrix[quote_idx][base_idx] = 1/askPrice
-            self.fee_matrix[quote_idx][base_idx] = takerFee
-            self.fee_matrix[base_idx][quote_idx] = takerFee
+            if bid_tradable:
+                self.quote_matrix[base_idx][quote_idx] = bidPrice
+                self.fee_matrix[base_idx][quote_idx] = takerFee
+            else:
+                skip_count += 1
+            
+            # sell one unit of quote currency to buy base currency
+            if ask_tradable:            
+                self.quote_matrix[quote_idx][base_idx] = 1/askPrice
+                self.fee_matrix[quote_idx][base_idx] = takerFee
+            else:
+                skip_count += 1
+
+        self.logger.info(f"{skip_count} bid/ask quotes are skipped given size <${self.bid_ask_min_usd}.")
 
         if self.zero_fees:
             self.quote_matrix_w_fee = self.quote_matrix
@@ -150,7 +185,6 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         self.quote_matrix_ln = -1 * np.log(self.quote_matrix_w_fee)
         self.quote_matrix_ln[self.quote_matrix_ln == 0] = 100
-
         np.fill_diagonal(self.quote_matrix_ln, 0)      
 
     def optimize(self) -> bool: 
