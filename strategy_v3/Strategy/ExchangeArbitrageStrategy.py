@@ -26,6 +26,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
                 bid_ask_min = 2,     
                 max_trades = -1,          
                 min_pnl = 50,      
+                is_execute = False,
         ):
         '''
             zero_fees:      set to True if you want to use zero fees
@@ -33,6 +34,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
             bid_ask_min:    minimum order size for current best bid and ask quote, this is represented in multiple of trade_size
             max_trades:     set to -1 for unlimited trades
             min_pnl:        minimum pnl in bps to start a trade
+            execute:        execute the trade or not
         '''
 
         # strategy_id is used to identify the strategy from list of orders
@@ -51,12 +53,14 @@ class ExchangeArbitrageStrategy(StrategyModel):
         self.trade_size = trade_size
         self.bid_ask_min = bid_ask_min
         self.bid_ask_min_usd = self.trade_size * self.bid_ask_min
+        self.is_execute = is_execute
 
         self.logger.info(f"trade_size: {self.trade_size}")
         self.logger.info(f"bid_ask_min: {self.bid_ask_min} (${self.bid_ask_min_usd})")
         self.logger.info(f"zero_fees: {self.zero_fees}")
         self.logger.info(f"max_trades: {self.max_trades}")
         self.logger.info(f"min_pnl: {self.min_pnl}bps")
+        self.logger.info(f"is_execute: {self.is_execute}")
         assert self.max_trades == -1 or self.max_trades >= 2, "max_trades must be >= 2"
 
 
@@ -311,9 +315,13 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         return True
     
-    def execute(self, force=False, *args, **kwargs):        
-        if self.zero_fees and not force:
+    def execute(self, *args, **kwargs):        
+        if self.zero_fees:
             self.logger.info('Do not execute the trades given zero_fees assumptions.')
+            return
+        
+        if self.is_execute:
+            self.logger.info('Do not execute the strategy.')
             return
         
         # Trade the First Group For Now
