@@ -320,7 +320,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
             self.logger.info('Do not execute the trades given zero_fees assumptions.')
             return
         
-        if self.is_execute:
+        if not self.is_execute:
             self.logger.info('Do not execute the strategy.')
             return
         
