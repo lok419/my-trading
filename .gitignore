@@ -164,6 +164,7 @@ cython_debug/
 *.csv
 *.pl
 *.db
+*.parquet
 /strategy_v3/execute.json
 catboost_info*
 
