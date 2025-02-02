@@ -130,7 +130,7 @@ class MeanVarianceOpt(StrategyBase):
                     constraints.append(cp.sum(w) <= 1)
                 
                 prob = cp.Problem(cp.Maximize(ret - gamma_par * risk), constraints)                            
-                prob.solve()    
+                prob.solve(solver='ECOS')    
 
                 weight = w.value
 
