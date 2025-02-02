@@ -85,15 +85,16 @@ def performance_summary_table(rets_dict, benchmark=[]):
     for strategy, r in rets_dict.items():
         perf = performance_summary(r)
         del perf['strategy']
-        measures = [title_case(x) for x in list(perf.keys())]
-        temp = pd.DataFrame({'Measure': measures, strategy: list(perf.values())})     
-        temp = temp.set_index('Measure')
-
+        measures = [title_case(x) for x in list(perf.keys())]        
+        temp = pd.DataFrame({'Measure': measures, strategy: list(perf.values())})                     
         if table.empty:
             table = temp
         else:
             table = table.merge(temp, on='Measure', how='outer', validate='1:1')
-            
+
+    table['Measure'] = pd.Categorical(table['Measure'], categories=measures, ordered=True)
+    table = table.set_index('Measure').sort_index()
+       
     return table
 
 @cache

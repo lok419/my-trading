@@ -19,7 +19,7 @@ def get_sp500_tickers():
 def get_risk_free_rate(is_daily = True):
     rf = yf.download(tickers='^IRX',interval="1d",auto_adjust=True).reset_index()
     rf = rf.set_index('Date')
-    rf = rf['Close']
+    rf = rf['Close']['^IRX']
     rf /= 100
     if is_daily:
         rf = (1+rf) ** (1/365) -1
