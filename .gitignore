@@ -182,3 +182,4 @@ airflow/git_version
 airflow/logs/
 airflow-webserver.pid
 webserver_config.py
+venv-3.10/
