@@ -1,5 +1,5 @@
 from time import sleep
-from account import Binance
+from account.Binance import Binance
 from strategy_v3.ExecuteSetup import ExecuteSetup
 from strategy_v3.Executor import ExecutorModel, ExecutorBacktest
 from strategy_v3.DataLoader import DataLoaderModel

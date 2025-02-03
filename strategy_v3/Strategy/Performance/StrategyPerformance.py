@@ -91,14 +91,13 @@ class StrategyPerformance(object):
         for row in open_sell:
             pnl.append((close_dt, row['executedQty'] * (row['fill_price'] - close_px)))
         
-        df_pnl = pd.DataFrame(pnl, columns=['Date', 'pnl_gross'])
-
-        # in case of no data, we need to cast column 'Date' to datetime64
+        df_pnl = pd.DataFrame(pnl, columns=['Date', 'pnl_gross'])        
         df_pnl['Date'] = pd.to_datetime(df_pnl['Date'])
         df_pnl['Date'] = df_pnl['Date'].dt.round(self.interval_round)        
         df_pnl = df_pnl.groupby(['Date']).aggregate({'pnl_gross': 'sum'}).reset_index()
 
-        df_pnl = pd.merge(self.df[['Date']], df_pnl, how='outer', on='Date', validate='1:1')
+        # in case there is no pnl, cannot join directly given tz is none
+        df_pnl = pd.merge(self.df[['Date']], df_pnl, how='outer', on='Date', validate='1:1') if len(df_pnl) > 0 else self.df[['Date']].assign(pnl_gross=0)            
         df_pnl = pd.merge(df_pnl, df_fee, how='left', on=['Date'], validate='1:1')
         df_pnl = df_pnl.fillna(0)        
 

@@ -10,7 +10,7 @@ from utils.logging import get_logger
 from utils.data_helper import *
 from utils.ccy import ExchangeRateGraph
 from strategy_v3.Strategy import StrategyModel
-from account import Binance
+from account.Binance import Binance
 from tabulate import tabulate
 
 pd.set_option('display.max_rows', 100)
@@ -114,8 +114,8 @@ class ExchangeArbitrageStrategy(StrategyModel):
         # Given the market price, this determine the trade size for each predefined currency in wallet
         self.trade_currency = {
             'USDT': self.trade_size,
-            'ETH':  self.trade_size / float(df_symbols[df_symbols['symbol'] == 'BTCUSDT'].iloc[0]['midPrice']),
-            'BTC':  self.trade_size / float(df_symbols[df_symbols['symbol'] == 'ETHUSDT'].iloc[0]['midPrice']),
+            'ETH':  self.trade_size / float(df_symbols[df_symbols['symbol'] == 'ETHUSDT'].iloc[0]['midPrice']),
+            'BTC':  self.trade_size / float(df_symbols[df_symbols['symbol'] == 'BTCUSDT'].iloc[0]['midPrice']),
         }
         self.logger.info(self.trade_currency)
 
@@ -216,7 +216,7 @@ class ExchangeArbitrageStrategy(StrategyModel):
 
         # Form and solve problem.
         prob = cp.Problem(obj, constraints)
-        prob.solve(verbose=True)
+        prob.solve(verbose=True, solver='SCIPY')
         self.logger.info(f"CVXPY - Status: {prob.status}")
         self.logger.info(f"CVXPY - Optimal value: {prob.value}")
 

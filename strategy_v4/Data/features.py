@@ -14,7 +14,7 @@ def gen_feature_return(df: DataFrame) -> DataFrame:
     ret = np.log(df['Close'] / df['Close'].shift(1)).fillna(0)        
     for w in windows:
         x = ret.rolling(window=w, min_periods=w).mean()
-        name = f'Return{w}d'
+        name = f'return{w}d'
         df = append_features(df, x, name)
     return df
 
@@ -22,7 +22,7 @@ def gen_feature_rsi(df: DataFrame) -> DataFrame:
     windows = [2,14,28,60]
     for w in windows:
         x = rsi(df['Close'], w)
-        name = f'RSI{w}d'
+        name = f'rsi{w}d'
         df = append_features(df, x, name)
     return df
 
@@ -31,7 +31,7 @@ def gen_feature_volume(df: DataFrame) -> DataFrame:
     vol = df['Volume']
     for w in windows:
         x = vol.rolling(window=w, min_periods=w).mean()
-        name = f'Volume{w}d'
+        name = f'volume{w}d'
         df = append_features(df, x, name)
     return df
 
@@ -41,7 +41,7 @@ def gen_feature_std(df: DataFrame) -> DataFrame:
 
     for w in windows:
         x = ret.rolling(window=w, min_periods=w).std()
-        name = f'Std{w}d'
+        name = f'std{w}d'
         df = append_features(df, x, name)
 
     return df
