@@ -7,5 +7,7 @@
             "path": "../hummingbot"
         }
     ],
-    "settings": {}
+    "settings": {
+        "python.defaultInterpreterPath": "./venv/bin/python"
+    }
 }
