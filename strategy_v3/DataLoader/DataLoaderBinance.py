@@ -1,6 +1,6 @@
 from strategy_v3.DataLoader import DataLoaderModel
 from pandas.core.frame import DataFrame
-from account import Binance
+from account.Binance import Binance
 from datetime import datetime
 
 class DataLoaderBinance(DataLoaderModel):

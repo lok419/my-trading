@@ -1,5 +1,5 @@
 from strategy_v3.Executor import ExecutorModel
-from account import Binance
+from account.Binance import Binance
 from datetime import datetime
 from binance.exceptions import BinanceAPIException 
 from pandas.core.frame import DataFrame

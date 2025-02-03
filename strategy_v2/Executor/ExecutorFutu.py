@@ -1,6 +1,6 @@
 from strategy_v2.Executor import ExecutorModel
 from strategy_v2.Portfolio import PortfolioModel
-from account import Futu
+from account.Futu import Futu
 from futu import *
 from utils.logging import get_logger
 from utils.credentials import FUTU_TRADE_UNLOCK_PIN

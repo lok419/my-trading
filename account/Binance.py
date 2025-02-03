@@ -1,7 +1,7 @@
 from binance.client import Client
 from utils.credentials import BINANCE_API_KEY, BINANCE_API_SECRET
 from pandas.core.frame import DataFrame
-from account import AccountModel
+from account.AccountModel import AccountModel
 from datetime import datetime
 from utils.logging import get_logger
 from zoneinfo import ZoneInfo

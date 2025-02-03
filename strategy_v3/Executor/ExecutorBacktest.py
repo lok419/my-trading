@@ -1,4 +1,4 @@
-from account import Binance
+from account.Binance import Binance
 from strategy_v3.Executor import ExecutorModel
 from datetime import datetime
 from pandas.core.frame import DataFrame
