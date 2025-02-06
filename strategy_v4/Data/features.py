@@ -46,6 +46,11 @@ def gen_feature_std(df: DataFrame) -> DataFrame:
 
     return df
 
+def gen_feature_mr_ratio(df: DataFrame) -> DataFrame:
+    price_rev = (df['High'] - df['Low']) / 2 - df['Close']
+    df = append_features(df, price_rev, 'price_rev')
+    return df
+
 def append_features(df: DataFrame, fs: DataFrame, name: str):
     fs.columns = pd.MultiIndex.from_product([[name], fs.columns])
     return pd.concat([df, fs], axis=1)

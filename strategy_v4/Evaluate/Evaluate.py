@@ -53,11 +53,13 @@ class Evaluate(object):
 
         df_pred = []
         for model_name in model_names:
-            pred = pd.read_parquet(f'data/parquet/model_pred/{model_name}.parquet')
-            pred['model'] = model_name            
-
-            df_pred.append(pred)            
-            self.logger.info(f'loaded {model_name}.')
+            try:
+                pred = pd.read_parquet(f'data/parquet/model_pred/{model_name}.parquet')
+                pred['model'] = model_name            
+                df_pred.append(pred)            
+                self.logger.info(f'loaded {model_name}.')
+            except Exception as e:
+                self.logger.error(f'cannot load {model_name}')
 
         df_pred = pd.concat(df_pred)
         self.df_pred = df_pred
