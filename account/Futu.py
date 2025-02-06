@@ -2,7 +2,7 @@ from futu import *
 from utils.credentials import FUTU_TRADE_UNLOCK_PIN
 from utils.logging import get_logger
 from pandas.core.frame import DataFrame
-from account import AccountModel
+from account.AccountModel import AccountModel
 
 class Futu(AccountModel):
     '''
