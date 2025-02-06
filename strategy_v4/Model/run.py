@@ -3,11 +3,13 @@ from sklearn.model_selection import train_test_split
 from strategy_v4.config import MODEL_LAYER, DATA_LAYER
 from strategy_v4.Data.Data import DataLayer
 from strategy_v4.Model.Model import Model
+from strategy_v4.Model.Preprocess import Preprocess
 from tqdm import tqdm
 from copy import copy
 
 def run_this(
         model: Model,
+        preprocess: Preprocess = None,
         features: list[str] = ['*'],
         label_name :str = MODEL_LAYER.label_name,
         label_shift :int = MODEL_LAYER.label_shift,
@@ -53,10 +55,19 @@ def run_this(
 
             X, y = df_[fs], df_['label']            
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=False)
-            model_.fit(X_train, y_train)        
+            
+            if preprocess is not None:
+                preprocess.fit(X_train)                
+                X_train_ = preprocess.transform(X_train)                
+                X_test_ = preprocess.transform(X_test)
+            else:
+                X_train_ = X_train.values
+                X_test_ = X_test.values
+
+            model_.fit(X_train_, y_train)        
                         
-            pred_in = pd.DataFrame({'actual': y_train, 'pred': model_.predict(X_train), 'pred_type': 'in-sample', 'asset': asset, 'date': X_train.index})
-            pred_out = pd.DataFrame({'actual': y_test, 'pred': model_.predict(X_test), 'pred_type': 'out-sample', 'asset': asset, 'date': X_test.index})
+            pred_in = pd.DataFrame({'actual': y_train, 'pred': model_.predict(X_train_), 'pred_type': 'in-sample', 'asset': asset, 'date': X_train.index})
+            pred_out = pd.DataFrame({'actual': y_test, 'pred': model_.predict(X_test_), 'pred_type': 'out-sample', 'asset': asset, 'date': X_test.index})
             pred = pd.concat([pred_in, pred_out])            
 
             predictions.append(pred)
@@ -71,7 +82,9 @@ def run_once(model_name, assets=[]) -> tuple[pd.DataFrame, dict[str, Model]]:
     setup = MODEL_LAYER.models[model_name]
     model = setup['model']
     features = setup['features']        
-    df_pred, models = run_this(model, features, assets=assets)    
+    preprocess = setup.get('preprocess', None)
+
+    df_pred, models = run_this(model, preprocess, features, assets=assets)    
     return df_pred, models
 
 def run(model_name, assets=[]):
