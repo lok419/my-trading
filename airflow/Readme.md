@@ -68,6 +68,13 @@ brew services start rabbitmq
 
 can check status under http://localhost:15672/#/, user/pwd = guest
 
+Also need to increase the consumer_timeout in /opt/homebrew/etc/rabbitmq/rabbitmq.conf (need to create for first time), which is the timeout for each task
+
+```
+# 10 hour in milliseconds
+consumer_timeout = 36000000
+```
+
 ### Initalize RabbitMQ
 ```
 rabbitmqctl add_user admin admin

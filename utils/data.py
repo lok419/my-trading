@@ -8,9 +8,17 @@ from datetime import datetime
 from utils.data_helper import add_bday
 
 @cache
-def get_sp500_tickers():
+def get_sp500_tickers() -> list[str]:
     sp500_url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
     table = pd.read_html(sp500_url)[0]
+    tickers = list(table['Symbol'].values)
+    tickers = list(map(lambda x: x.replace(".", "-"), tickers))
+    return tickers
+
+@cache
+def get_djia_tickers() -> list[str]:
+    url = 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average'
+    table = pd.read_html(url)[2]
     tickers = list(table['Symbol'].values)
     tickers = list(map(lambda x: x.replace(".", "-"), tickers))
     return tickers
