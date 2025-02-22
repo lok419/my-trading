@@ -10,7 +10,7 @@ class DataLayer(object):
     def __init__(self,                  
                  start_date: datetime, 
                  end_date: datetime,
-                 instruments: list[str] = get_sp500_tickers(),
+                 instruments: list[str] = None,
                  dataset:str = 'sp500'            
         ):        
         '''
@@ -19,6 +19,8 @@ class DataLayer(object):
                 end_date: end date
                 instruments: list of tickers for yahoo API
         '''
+        if instruments is None:
+            instruments = get_sp500_tickers()
 
         self.start_date = start_date
         self.end_date = end_date
