@@ -10,7 +10,7 @@ from strategy_v2.Strategy.StrategyBase import StrategyBase
 from strategy_v2.Strategy.MVO.AlphaModel import ZeroAlpha
 from strategy_v2.Strategy.MVO.RiskModel import ZeroCov
 from utils.data import get_yahoo_data_formatted
-from utils.data_helper import add_bday
+from utils.data_helper import add_bday, is_ny_trading_hours, get_today
 
 class MeanVarianceOpt(StrategyBase):      
 
@@ -98,11 +98,19 @@ class MeanVarianceOpt(StrategyBase):
         last_weight = np.ones(len(self.instruments)) / len(self.instruments)       
         with tqdm(total=len(dates_arr)) as pbar:
 
-            # generates position as of SOD of "date", so you only access to data prior to "date"
-            for date in dates_arr:        
+            # generates position as of SOD of "date", so you can only access to data prior to "date"
+            for date in dates_arr:   
+                                
+                # If T is today, include latest data T
+                # Normally when we backtest at T, we should use data prior to T to avoid lookahead bias
+                # However, if T is today and we want to generate a position for T, it is okay to include T data 
+                model_date = date
+                if date == get_today():
+                    model_date = date + BDay(1)
+                    self.logger.info(f"{date:%Y-%m-%d} is today, shift position date to include latest market data at {datetime.now():%I:%m %p}")
 
-                expected_ret = self.alpha_model.expected_return(date)
-                expected_ret_cov = self.risk_model.expected_variance(date)
+                expected_ret = self.alpha_model.expected_return(model_date)
+                expected_ret_cov = self.risk_model.expected_variance(model_date)
 
                 self.alphas.append(expected_ret)
                 self.risks.append(expected_ret_cov)

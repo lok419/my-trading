@@ -30,7 +30,6 @@ def add_bday(date, offset, market='NYSE'):
             new_date = new_date + BDay(1)
         elif offset <= 0:
             new_date = new_date + BDay(-1)
-
     return new_date
 
 def get_today(offset=0, tz='US/Eastern', market='NYSE'):
@@ -39,6 +38,20 @@ def get_today(offset=0, tz='US/Eastern', market='NYSE'):
         date = add_bday(date, offset, market=market)
     date = pd.to_datetime(date)
     return date 
+
+def is_ny_trading_hours(time):
+    tz = 'US/Eastern'
+    market = 'NYSE'
+    time = time.astimezone(pytz.timezone(tz))
+
+    nyse_open = time.replace(hour=9, minute=30, second=0, microsecond=0)
+    nyse_close = time.replace(hour=16, minute=0, second=0, microsecond=0)
+        
+    is_holiday = time.date() in trading_holidays(market)
+    is_weekend = time.date().weekday() >= 5
+    is_market_hours = nyse_open <= time <= nyse_close
+
+    return not is_holiday and not is_weekend and is_market_hours
 
 def title_case(x):
     return x.title().replace('_', ' ')

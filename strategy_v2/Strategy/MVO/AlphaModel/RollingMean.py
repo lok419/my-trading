@@ -16,10 +16,7 @@ class RollingMean(AlphaModel):
         '''
             Compute rolling returns as T's trading signals in advance
         '''
-        ret = self.data['px']['Return']    
-
-        # T's position is based on T-1 return and before
-        df_ret = ret.shift(1)
+        df_ret = self.data['px']['Return']                    
         df_ret = df_ret.rolling(self.lookback).mean()
         self.df_ret = df_ret                
 
@@ -28,6 +25,9 @@ class RollingMean(AlphaModel):
             Expected return based on lookback periods
             return a array of returns
         '''        
-        expected_ret = np.array(self.df_ret.loc[:pos_date].iloc[-1])
+        # select row with date just before pos_date
+        expected_ret = self.df_ret.loc[self.df_ret.index[self.df_ret.index < pos_date][-1]]
+        assert expected_ret.name < pos_date, 'Optimization has lookahead bias'
+        expected_ret = np.array(expected_ret)
 
         return expected_ret
