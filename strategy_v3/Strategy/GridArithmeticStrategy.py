@@ -257,6 +257,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
     def get_grid_active_interval(self, date: datetime) -> float:
         '''
             Active interval of the outstanding grids
+            This is the time since the first grid orders, this is used to count how much time the grid was placed, if too long, terminate
         '''
         if self.get_grid_status() == GRID_STATUS.ACTIVE:
             all_orders = self.get_all_orders()
