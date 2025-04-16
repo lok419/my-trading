@@ -46,6 +46,28 @@ with DAG(
     )
 
 with DAG(
+    "Grid_ETHUSDT",    
+    default_args={
+        "depends_on_past": False,        
+        "email_on_failure": False,
+        "email_on_retry": False,
+        "retries": 0,        
+    },
+    description="Grid Trading Strategy for ETHUSDT",
+    schedule="@hourly",
+    start_date=datetime(2025, 4, 17),
+    catchup=False,
+) as dag:
+
+    # run
+    run = PythonOperator(
+        task_id="run_strategy",
+        python_callable=execute,
+        op_args=['ETHv1', '10 Days Ago'],
+        dag=dag
+    )
+
+with DAG(
     "Exchange_Arbitrage",    
     default_args={
         "depends_on_past": False,        
