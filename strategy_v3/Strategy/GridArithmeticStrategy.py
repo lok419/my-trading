@@ -20,6 +20,7 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
                  vol_grid_scale: float = 1,
                  vol_stoploss_scale: float = 7,
                  position_size: float = 100,
+                 hurst_exp_lookback: int = 100,
                  hurst_exp_mr_threshold: float = 0.5,
                  hurst_exp_mo_threshold: float = float('inf'),                 
                  stoploss_interval: float = float('inf'),
@@ -55,11 +56,12 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
             comment=comment
         )        
         
-        self.grid_size = grid_size        
+        self.grid_size = grid_size                   
         self.vol_lookback = vol_lookback
         self.vol_grid_scale = vol_grid_scale
         self.vol_stoploss_scale = vol_stoploss_scale
         self.position_size = position_size
+        self.hurst_exp_lookback = hurst_exp_lookback
         self.hurst_exp_mr_threshold = hurst_exp_mr_threshold
         self.hurst_exp_mo_threshold = hurst_exp_mo_threshold
         self.stoploss_interval = stoploss_interval        
@@ -120,8 +122,8 @@ class GridArithmeticStrategy(StrategyBase, GridPerformance):
         df['close_sma'] = df['Close'].rolling(self.vol_lookback).mean().shift(1)
         df['close_chg'] = df['Close'].diff().shift(1)        
 
-        df["half_life"] = df['Close'].rolling(100).apply(lambda x: time_series_half_life(x)).shift(1)
-        df["hurst_exponent"] = df["Close"].rolling(100).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
+        df["half_life"] = df['Close'].rolling(self.hurst_exp_lookback).apply(lambda x: time_series_half_life(x)).shift(1)
+        df["hurst_exponent"] = df["Close"].rolling(self.hurst_exp_lookback).apply(lambda x: time_series_hurst_exponent(x)).shift(1)
         df['hurst_exponent_avg'] = df["hurst_exponent"].rolling(self.vol_lookback).mean()
 
         # Average True Range
