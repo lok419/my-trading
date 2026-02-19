@@ -66,14 +66,8 @@ def round_down(number, decimal_places):
     factor = 10 ** decimal_places
     return math.floor(number * factor) / factor
 
-if __name__ == "__main__":    
-    hols = trading_holidays()
-    d = datetime(2023,10,27) 
-
-    next = add_bday(d, 1)
-    last_b = add_bday(add_bday(d, 1), -1)
-
-    print(hols)
-    print(next)
-    print(last_b)
-    print(get_today())
+def get_arr_val(arr, index):
+    """Get value from array-like object, handling Series, arrays, and lists."""
+    if isinstance(arr, pd.Series):
+        return arr.iloc[index]
+    return arr[index]

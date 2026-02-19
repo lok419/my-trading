@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from pandas.core.api import DataFrame as DataFrame, Series
 from strategy_v2.TradingSubSystem import TradingSubSystemBase
+from utils.data_helper import get_arr_val
 from utils.performance import annualized_volatility_ts
 
 class TradingSubSystemSingle(TradingSubSystemBase):
@@ -69,8 +70,7 @@ class TradingSubSystemSingle(TradingSubSystemBase):
         """ 
         close_vol = annualized_volatility_ts(px_ret, windows=px_vol_windows)               
         scale_factor = (vol_target / close_vol).shift(1).bfill() if vol_target > 0 else np.ones(len(close_vol))                            
-
-        return scale_factor, close_vol[-1]
+        return scale_factor, get_arr_val(close_vol, -1)
         
     def get_position(self) -> DataFrame:
         return self.scaled_combined_position

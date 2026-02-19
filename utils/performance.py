@@ -1,5 +1,5 @@
 from utils.data import get_latest_risk_free_rate
-from utils.data_helper import title_case
+from utils.data_helper import title_case, get_arr_val
 from functools import cache
 from IPython.display import display
 from datetime import datetime
@@ -14,11 +14,23 @@ import plotly.graph_objects as go
 import plotly
 
 def cumulative_return(r):        
-    cum_return = np.cumprod(r+1)        
+    # Replace any NaN or inf values with 0
+    r_arr = np.asarray(r, dtype=np.float64)    
+    r_arr = np.nan_to_num(r_arr, nan=0.0, posinf=0.0, neginf=0.0)
+    cum_return = np.cumprod(r_arr+1)
+    # Preserve index if input was Series
+    if isinstance(r, pd.Series):
+        return pd.Series(cum_return, index=r.index)
     return cum_return
     
 def cumlative_log_return(r):
-    cum_return = 1 + np.cumsum(np.log(r+1))
+    # Replace any NaN or inf values with 0 to avoid log errors
+    r_arr = np.asarray(r, dtype=np.float64)    
+    r_arr = np.nan_to_num(r_arr, nan=0.0, posinf=0.0, neginf=0.0)
+    cum_return = 1 + np.cumsum(np.log(r_arr+1))
+    # Preserve index if input was Series
+    if isinstance(r, pd.Series):
+        return pd.Series(cum_return, index=r.index)
     return cum_return
 
 def annualized_return(r):    
@@ -42,14 +54,18 @@ def annualized_volatility_ts(r, windows=20):
     return std
 
 def drawdown(r):
-    val = cumulative_return(r)
-    val_dd = []
+    val_raw = cumulative_return(r)
+    val = np.asarray(val_raw)
+    val_dd = []    
     peak = val[0]
     for v in val:
         peak = max(peak, v)        
         dd = (v - peak) / peak
         val_dd.append(dd)
-    return val_dd
+    # Preserve index if input was Series
+    if isinstance(r, pd.Series):
+        return pd.Series(val_dd, index=r.index)
+    return np.array(val_dd)
 
 def maximum_drawdown(r):
     dd = drawdown(r)
@@ -59,7 +75,8 @@ def maximum_drawdown(r):
 def performance_summary(r, strategy=""):
     res = {}    
     res['strategy'] = strategy
-    res['cumulative_return'] = cumulative_return(r)[-1]
+    cum_ret = cumulative_return(r)
+    res['cumulative_return'] = float(np.asarray(cum_ret)[-1])
     res['annualized_return'] = annualized_return(r)
     res['annualized_volatility'] = annualized_volatility(r)
     res['annualized_sharpe_ratio'] = annualized_sharpe_ratio(r)

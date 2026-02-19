@@ -5,7 +5,7 @@ import yfinance as yf
 import requests
 from functools import cache
 from datetime import datetime
-from utils.data_helper import add_bday
+from utils.data_helper import add_bday, get_arr_val
 
 @cache
 def get_sp500_tickers() -> list[str]:
@@ -39,7 +39,7 @@ def get_risk_free_rate(is_daily = True):
 @cache
 def get_latest_risk_free_rate(is_daily = True):
     rf = get_risk_free_rate(is_daily = is_daily)
-    return rf[-1]
+    return get_arr_val(rf, -1)
 
 def get_sp500_constituent_hist():
     sp500_url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
