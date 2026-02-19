@@ -183,3 +183,4 @@ airflow/logs/
 airflow-webserver.pid
 webserver_config.py
 venv-3.10/
+.vscode/settings.json
