@@ -24,6 +24,54 @@ def time_series_hurst_exponent(ts):
     """    
     return compute_Hc(np.abs(ts), kind='price', simplified=True)[0]
 
+def time_series_hurst_exponent_v2(series, min_lag=10, max_lag=None):
+    """
+    Calculate Hurst Exponent using Rescaled Range (R/S) Analysis
+    H < 0.5 = mean reversion, H = 0.5 = random walk, H > 0.5 = trending
+    """
+    if max_lag is None:
+        max_lag = len(series) // 2
+    
+    series = np.asarray(series, dtype=np.float64)
+    lags = range(min_lag, max_lag)
+    rs_values = []
+    
+    for n in lags:
+        # Split series into chunks of size n
+        num_chunks = len(series) // n
+        rs_list = []
+        
+        for i in range(num_chunks):
+            chunk = series[i*n:(i+1)*n]
+            
+            # Mean-adjusted series
+            mean_chunk = np.mean(chunk)
+            Y = np.cumsum(chunk - mean_chunk)
+            
+            # Range
+            R = np.max(Y) - np.min(Y)
+            
+            # Standard deviation
+            S = np.std(chunk, ddof=1)
+            
+            # Avoid division by zero
+            if S > 0:
+                rs_list.append(R / S)
+        
+        # Average R/S for this lag
+        if rs_list:
+            rs_values.append(np.mean(rs_list))
+    
+    # Log-log regression: log(RS) = H * log(n) + c
+    lags_array = np.array(list(range(min_lag, min_lag + len(rs_values))))
+    rs_values = np.array(rs_values)
+    
+    poly = np.polyfit(np.log(lags_array), np.log(rs_values), 1)
+    hurst = poly[0]
+    
+    # Constrain to valid range [0, 1]
+    return np.clip(hurst, 0, 1)
+
 def time_series_coint_johansen(ts, normalize=True, ci=0.99):
     """ 
         Conduct johansen test on multiple time series
