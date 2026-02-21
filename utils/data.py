@@ -112,11 +112,7 @@ def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_d
 
     # Bug from yahoo API, it doesn't include price at end_date            
     px = get_yahoo_data(tickers=tuple(instruments_wo_cash), interval="1d",auto_adjust=True, start=start_date, end=add_bday(end_date, 10))
-    px = px.copy()
-
-    # If there is only one instruments, restructure the data to include name in columns
-    if len(instruments_wo_cash) == 1:
-        px.columns = pd.MultiIndex.from_product([px.columns, instruments_wo_cash])
+    px = px.copy()    
 
     # add cash separately
     if 'CASH' in instruments:
