@@ -60,7 +60,7 @@ class Executor:
             instruments=self.portfolio.instruments,
             start_date=start_date - BDay(self.lookback),  # Fetch extra data for lookback period
             end_date=end_date
-        )
+        )        
 
         return self.df_ohlc
     

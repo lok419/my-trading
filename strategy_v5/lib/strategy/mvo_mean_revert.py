@@ -52,6 +52,7 @@ class MVOMeanRevertRebalance(Strategy):
         lookback_days: int = 60,        
         risk_aversion: float = 1.0,
         max_weight: float = 0.3,
+        min_weight: float = 0.0,
         use_shrinkage: bool = True,        
     ):
         """
@@ -72,24 +73,37 @@ class MVOMeanRevertRebalance(Strategy):
             Use to prevent concentration risk.
             e.g., 0.3 means no asset can be >30% of portfolio
         
+        min_weight : float, default=0.0
+            Minimum weight allowed for any single asset (0 to 1).
+            Use to ensure a minimum allocation to each asset.
+            e.g., 0.1 means each asset must have at least 10% of portfolio
+        
         use_shrinkage : bool, default=True
             Whether to apply covariance matrix shrinkage (Ledoit-Wolf).
             Recommended for small lookback periods or high-dimensional data.        
         """
-        super().__init__(f"MVOMeanRevert(lookback_days={lookback_days}, risk_aversion={risk_aversion}, max_weight={max_weight})")
+        super().__init__(f"MVOMeanRevert(lookback_days={lookback_days}, risk_aversion={risk_aversion}, min_weight={min_weight}, max_weight={max_weight})")
         self.lookback_days = lookback_days        
         self.risk_aversion = risk_aversion
         self.max_weight = max_weight
+        self.min_weight = min_weight
         self.use_shrinkage = use_shrinkage        
         self.logger = get_logger(self.name)
     
     def _estimate_expected_returns(self, price_history: pd.DataFrame) -> np.ndarray:
         """
-        Estimate expected returns using mean reversion signals.
+        Estimate expected returns using mean reversion signals with z-score normalization.
+        
+        Uses z-score (deviation from mean in std units) scaled by annualized volatility
+        to generate expected returns comparable to annualized returns in MVO.
         
         Assets below their mean are expected to revert UP (positive return).
         Assets above their mean are expected to revert DOWN (negative return).
-        The strength is proportional to the distance from the mean, annualized.
+        The strength is proportional to:
+        - Z-score: How many standard deviations from mean (unitless)
+        - Annualized volatility: Scales z-score to annual return units
+        
+        Formula: Expected Return = -z_score * annualized_volatility * signal_strength
         
         Parameters:
         -----------
@@ -99,24 +113,35 @@ class MVOMeanRevertRebalance(Strategy):
         Returns:
         --------
         np.ndarray
-            Expected returns for each asset (annualized mean reversion signal)
+            Expected returns for each asset (annualized, in decimal form)
         """
-        # Get current prices (last row) and historical mean
+        # Calculate daily returns and statistics
+        daily_returns = price_history.pct_change().dropna()
+        
+        # Annualized volatility for each asset (252 trading days per year)
+        annualized_vol = daily_returns.std().values * np.sqrt(252)
+        
+        # Get current prices and historical mean/std
         current_prices = price_history.iloc[-1].values
         mean_prices = price_history.mean().values
+        std_prices = price_history.std().values        
         
-        # Calculate deviation from mean as a percentage
-        deviation_from_mean = (current_prices - mean_prices) / mean_prices
+        # Calculate z-score: (price - mean) / std
+        z_scores = np.divide(
+            current_prices - mean_prices, 
+            std_prices, 
+            out=np.zeros_like(current_prices), 
+            where=std_prices != 0
+        )        
         
-        # Mean reversion expected return: negative of deviation
-        # If price is 10% below mean, we expect +10% reversion return
-        # If price is 10% above mean, we expect -10% reversion return
-        mean_revert_returns = -deviation_from_mean
+        # Clip extreme z-scores to prevent outliers from dominating
+        z_scores = np.clip(z_scores, -3, 3)
         
-        # Annualize the mean reversion signal (252 trading days per year)
-        annualized_returns = mean_revert_returns * 252
+        # Scale z-score by annualized volatility to get annualized expected returns
+        # Negative sign: below mean (negative z-score) → positive expected return (revert up)
+        expected_returns = -z_scores * annualized_vol        
         
-        return annualized_returns
+        return expected_returns
     
     def _estimate_covariance(self, price_history: pd.DataFrame) -> np.ndarray:
         """
@@ -194,6 +219,7 @@ class MVOMeanRevertRebalance(Strategy):
         constraints = [
             cp.sum(w) == 1,              # Fully invested
             w >= 0,                      # No short selling
+            w >= self.min_weight,        # Min weight constraint
             w <= self.max_weight         # Max weight constraint
         ]
         

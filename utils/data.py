@@ -108,7 +108,7 @@ def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_d
             end_date (datetime): End date
             add_cash (bool, optional): Add cash to the data. Defaults to False.
     '''
-    instruments_wo_cash = list(np.setdiff1d(instruments, ['CASH']))
+    instruments_wo_cash = [instrument for instrument in instruments if instrument != 'CASH']
 
     # Bug from yahoo API, it doesn't include price at end_date            
     px = get_yahoo_data(tickers=tuple(instruments_wo_cash), interval="1d",auto_adjust=True, start=start_date, end=add_bday(end_date, 10))
@@ -119,5 +119,10 @@ def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_d
         for col in px.columns.get_level_values(0).unique():
             px.loc[:, (col, 'CASH')] = 1
 
-    px = px[start_date: end_date]
+    px = px[start_date: end_date]    
+    px = px.reindex(columns=pd.MultiIndex.from_product(
+        [px.columns.get_level_values(0).unique(), instruments_wo_cash + (['CASH'] if 'CASH' in instruments else [])],
+        names=px.columns.names
+    ))    
+
     return px

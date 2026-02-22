@@ -7,6 +7,8 @@ Calculates performance metrics and compares multiple backtested portfolios.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from strategy_v5.lib.portfolio import Portfolio
 from utils.data import get_latest_risk_free_rate
 from IPython.display import display
@@ -247,7 +249,7 @@ class PortfolioEvaluator:
     - Create comparative visualizations
     """
     
-    def __init__(self, portfolios: list[Portfolio]):
+    def __init__(self, portfolios: list[Portfolio]|Portfolio):
         """
         Initialize evaluator with list of portfolios.
         
@@ -256,7 +258,12 @@ class PortfolioEvaluator:
         portfolios : list
             List of Portfolio objects with completed backtests
         """
-        self.portfolios = portfolios
+
+        if isinstance(portfolios, Portfolio):
+            self.portfolios = [portfolios]
+        else:
+            self.portfolios = portfolios  
+                      
         self.metrics_df = None
     
     def calculate_all_metrics(self) -> pd.DataFrame:
@@ -466,3 +473,109 @@ class PortfolioEvaluator:
         
         plt.tight_layout()
         plt.show()
+    
+    def plot_weights_history(self, portfolio_idx: int = 0, portfolio_name: str = None):
+        """
+        Plot historical weights distribution for a portfolio using Plotly.
+        
+        Shows how the portfolio allocation to each asset evolves over time.
+        Allows interactive selection/deselection of assets via legend clicks.
+        
+        Parameters:
+        -----------
+        portfolio_idx : int, default=0
+            Index of portfolio in self.portfolios list (if portfolio_name not provided)
+        
+        portfolio_name : str, optional
+            Name of portfolio to plot. If provided, overrides portfolio_idx.
+            If neither exists, defaults to first portfolio.
+        Returns:
+        --------
+        None (displays Plotly chart)
+        """
+        # Select portfolio by name or index
+        portfolio = None
+        
+        if portfolio_name:
+            for p in self.portfolios:
+                if p.name == portfolio_name:
+                    portfolio = p
+                    break
+            if portfolio is None:
+                print(f"Warning: Portfolio '{portfolio_name}' not found. Using first portfolio.")
+                portfolio = self.portfolios[0]
+        else:
+            if portfolio_idx >= len(self.portfolios):
+                print(f"Warning: Portfolio index {portfolio_idx} out of range. Using first portfolio.")
+                portfolio_idx = 0
+            portfolio = self.portfolios[portfolio_idx]
+        
+        # Get weights history
+        weights_df = portfolio.weights_history
+        
+        if weights_df is None or weights_df.empty:
+            print(f"Error: No weights history available for portfolio '{portfolio.name}'")
+            return
+        
+        # Create figure(s) based on chart_type                
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Portfolio Weights (Lines)', 'Portfolio Weights (Stacked)'),
+            specs=[[{'secondary_y': False}, {'secondary_y': False}]]
+        )
+        
+        # Add line chart traces
+        for asset in weights_df.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=weights_df.index,
+                    y=weights_df[asset],
+                    mode='lines',
+                    name=asset,
+                    hovertemplate='%{fullData.name}: %{y:.2%}<extra></extra>',
+                    line=dict(width=2),
+                    showlegend=True
+                ),
+                row=1, col=1
+            )
+        
+        # Add stacked area traces
+        for asset in weights_df.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=weights_df.index,
+                    y=weights_df[asset],
+                    mode='lines',
+                    name=asset,
+                    stackgroup='one',
+                    fillcolor=None,
+                    hovertemplate='%{fullData.name}: %{y:.2%}<extra></extra>',
+                    showlegend=False
+                ),
+                row=1, col=2
+            )
+        
+        # Update layout
+        fig.update_layout(
+            title_text=f'Portfolio Weights History - {portfolio.name}',
+            height=600,
+            width=1400,
+            hovermode='x unified',
+            template='plotly_white',
+            legend=dict(
+                yanchor='top',
+                y=0.99,
+                xanchor='left',
+                x=0.01,
+                bgcolor='rgba(255, 255, 255, 0.8)',
+                bordercolor='gray',
+                borderwidth=1
+            )
+        )
+        
+        # Update axes
+        fig.update_xaxes(title_text='Date', row=1, col=1)
+        fig.update_xaxes(title_text='Date', row=1, col=2)
+        fig.update_yaxes(title_text='Weight (%)', tickformat='.0%', range=[0, 1], row=1, col=1)
+        fig.update_yaxes(title_text='Weight (%)', tickformat='.0%', range=[0, 1], row=1, col=2)                 
+        fig.show()

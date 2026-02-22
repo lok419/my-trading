@@ -44,6 +44,7 @@ class MVOMomentumRebalance(Strategy):
         self,
         lookback_days: int = 60,
         risk_aversion: float = 1.0,
+        min_weight: float = 0.0,
         max_weight: float = 0.3,
         use_shrinkage: bool = True,        
     ):
@@ -65,14 +66,20 @@ class MVOMomentumRebalance(Strategy):
             Use to prevent concentration risk.
             e.g., 0.3 means no asset can be >30% of portfolio
         
+        min_weight : float, default=0.0
+            Minimum weight allowed for any single asset (0 to 1).
+            Use to ensure a minimum allocation to each asset.
+            e.g., 0.1 means each asset must have at least 10% of portfolio
+        
         use_shrinkage : bool, default=True
             Whether to apply covariance matrix shrinkage (Ledoit-Wolf).
             Recommended for small lookback periods or high-dimensional data.        
         """
-        super().__init__(f"MVOMomentum(lookback_days={lookback_days}, risk_aversion={risk_aversion}, max_weight={max_weight})")
+        super().__init__(f"MVOMomentum(lookback_days={lookback_days}, risk_aversion={risk_aversion}, min_weight={min_weight}, max_weight={max_weight})")
         self.lookback_days = lookback_days
         self.risk_aversion = risk_aversion
         self.max_weight = max_weight
+        self.min_weight = min_weight
         self.use_shrinkage = use_shrinkage        
         self.logger = get_logger(self.name)
     
@@ -175,6 +182,7 @@ class MVOMomentumRebalance(Strategy):
         constraints = [
             cp.sum(w) == 1,              # Fully invested
             w >= 0,                      # No short selling
+            w >= self.min_weight,        # Min weight constraint
             w <= self.max_weight         # Max weight constraint
         ]
         
