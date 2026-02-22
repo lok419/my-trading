@@ -1,9 +1,13 @@
 """
-MVO Momentum Strategy
+MVO Mean Reversion Strategy
 
-Mean-Variance Optimization portfolio using cvxpy.
+Mean-Variance Optimization portfolio using cvxpy with mean reversion signals.
 Maximizes expected return - risk_aversion_coefficient/2 * portfolio_variance
 subject to constraints on weights (fully invested, no short selling, max concentration).
+
+Mean reversion strategy: allocate more to assets below their lookback mean price
+(undervalued, expected to revert up) and less to assets above mean (overvalued,
+expected to revert down).
 """
 
 import pandas as pd
@@ -14,14 +18,17 @@ from strategy_v5.lib.strategy.strategy import Strategy
 from utils.logging import get_logger
 
 
-class MVOMomentumRebalance(Strategy):
+class MVOMeanRevertRebalance(Strategy):
     """
-    Mean-Variance Optimization (MVO) strategy using cvxpy.
+    Mean-Variance Optimization (MVO) strategy with mean reversion signals using cvxpy.
     
     Optimizes portfolio weights to maximize:
         Expected Return - (lambda / 2) * Portfolio Variance
     
-    where lambda is a risk aversion coefficient.
+    where expected returns are based on mean reversion signals:
+    - Assets trading below their lookback mean are expected to revert UP (positive return)
+    - Assets trading above their lookback mean are expected to revert DOWN (negative return)
+    - Strength of signal is proportional to distance from mean
     
     Constraints:
     - Weights sum to 1 (fully invested)
@@ -32,8 +39,8 @@ class MVOMomentumRebalance(Strategy):
     
     Example:
     --------
-    >>> strategy = MVOMomentumRebalance(
-    ...     lookback_days=60,
+    >>> strategy = MVOMeanRevertRebalance(
+    ...     lookback_days=60,    
     ...     risk_aversion=1.0,
     ...     max_weight=0.3,
     ...     use_shrinkage=True
@@ -42,18 +49,18 @@ class MVOMomentumRebalance(Strategy):
     
     def __init__(
         self,
-        lookback_days: int = 60,
+        lookback_days: int = 60,        
         risk_aversion: float = 1.0,
         max_weight: float = 0.3,
         use_shrinkage: bool = True,        
     ):
         """
-        Initialize MVOMomentumRebalance strategy.
+        Initialize MVOMeanRevertRebalance strategy.
         
         Parameters:
         -----------
         lookback_days : int, default=60
-            Number of trading days to use for return and covariance estimation.
+            Number of trading days to use for mean and covariance estimation.                
         
         risk_aversion : float, default=1.0
             Risk aversion coefficient (lambda).
@@ -69,8 +76,8 @@ class MVOMomentumRebalance(Strategy):
             Whether to apply covariance matrix shrinkage (Ledoit-Wolf).
             Recommended for small lookback periods or high-dimensional data.        
         """
-        super().__init__(f"MVOMomentum(lookback_days={lookback_days}, risk_aversion={risk_aversion}, max_weight={max_weight})")
-        self.lookback_days = lookback_days
+        super().__init__(f"MVOMeanRevert(lookback_days={lookback_days}, risk_aversion={risk_aversion}, max_weight={max_weight})")
+        self.lookback_days = lookback_days        
         self.risk_aversion = risk_aversion
         self.max_weight = max_weight
         self.use_shrinkage = use_shrinkage        
@@ -78,7 +85,11 @@ class MVOMomentumRebalance(Strategy):
     
     def _estimate_expected_returns(self, price_history: pd.DataFrame) -> np.ndarray:
         """
-        Estimate expected returns using simple mean return over lookback period.
+        Estimate expected returns using mean reversion signals.
+        
+        Assets below their mean are expected to revert UP (positive return).
+        Assets above their mean are expected to revert DOWN (negative return).
+        The strength is proportional to the distance from the mean, annualized.
         
         Parameters:
         -----------
@@ -88,16 +99,24 @@ class MVOMomentumRebalance(Strategy):
         Returns:
         --------
         np.ndarray
-            Expected returns for each asset (annualized)
+            Expected returns for each asset (annualized mean reversion signal)
         """
-        # Calculate daily returns
-        daily_returns = price_history.pct_change().dropna()
+        # Get current prices (last row) and historical mean
+        current_prices = price_history.iloc[-1].values
+        mean_prices = price_history.mean().values
         
-        # Annualize returns (252 trading days per year)
-        mean_daily_returns = daily_returns.mean()
-        annualized_returns = mean_daily_returns * 252
+        # Calculate deviation from mean as a percentage
+        deviation_from_mean = (current_prices - mean_prices) / mean_prices
         
-        return annualized_returns.values
+        # Mean reversion expected return: negative of deviation
+        # If price is 10% below mean, we expect +10% reversion return
+        # If price is 10% above mean, we expect -10% reversion return
+        mean_revert_returns = -deviation_from_mean
+        
+        # Annualize the mean reversion signal (252 trading days per year)
+        annualized_returns = mean_revert_returns * 252
+        
+        return annualized_returns
     
     def _estimate_covariance(self, price_history: pd.DataFrame) -> np.ndarray:
         """
@@ -149,7 +168,7 @@ class MVOMomentumRebalance(Strategy):
         Parameters:
         -----------
         expected_returns : np.ndarray
-            Expected returns for each asset
+            Expected returns for each asset (from mean reversion signals)
         
         cov_matrix : np.ndarray
             Covariance matrix of returns
@@ -204,7 +223,8 @@ class MVOMomentumRebalance(Strategy):
         **kwargs
     ) -> np.ndarray:
         """
-        Calculate optimal portfolio weights using MVO and convert to target shares.
+        Calculate optimal portfolio weights using MVO with mean reversion signals.
+        Convert to target shares.
         
         Parameters:
         -----------
@@ -241,7 +261,7 @@ class MVOMomentumRebalance(Strategy):
         close_prices = ohlc['Close']                                    
         n_assets = len(prices)
         
-        # Estimate expected returns and covariance
+        # Estimate expected returns (mean reversion signals) and covariance
         expected_returns = self._estimate_expected_returns(close_prices)
         cov_matrix = self._estimate_covariance(close_prices)
         

@@ -48,6 +48,91 @@ class MyCustomStrategy(Strategy):
 - `strategy/weight.py` - Equal-weight rebalancing
 - `strategy/momentum.py` - Momentum-based allocation
 - `strategy/mvo_momentum.py` - Mean-variance optimization with momentum
+- `strategy/mvo_mean_revert.py` - Mean-variance optimization with mean reversion
+
+## Available Strategy Implementations
+
+The framework includes several pre-built strategies in `strategy_v5/lib/strategy/`:
+
+### 1. **BuyAndHoldRebalance** - `buy_and_hold.py`
+Passive buy-and-hold strategy with no active rebalancing.
+```python
+from strategy_v5.lib.strategy import BuyAndHoldRebalance
+
+strategy = BuyAndHoldRebalance()
+portfolio = Portfolio(
+    name='Buy & Hold',
+    instruments=['AAPL', 'TSLA', 'NVDA'],
+    initial_capital=100_000,
+    strategy=strategy,
+    rebalance_freq=RebalanceFrequency.MONTHLY
+)
+```
+
+### 2. **WeightRebalance** - `weight.py`
+Equal-weight rebalancing - allocates capital equally across all assets.
+```python
+from strategy_v5.lib.strategy import WeightRebalance
+
+strategy = WeightRebalance()
+portfolio = Portfolio(
+    name='Equal Weight',
+    instruments=['AAPL', 'TSLA', 'NVDA', 'META'],
+    initial_capital=100_000,
+    strategy=strategy,
+    rebalance_freq=RebalanceFrequency.MONTHLY,
+    rebalance_day=1
+)
+```
+
+### 3. **MVOMomentumRebalance** - `mvo_momentum.py`
+Mean-Variance Optimization (MVO) with momentum signals.
+- Allocates more capital to assets with positive momentum (recent uptrends)
+- Uses lookback period mean returns as expected return signal
+- Optimizes weights to maximize: `Return - (λ/2) × Variance`
+```python
+from strategy_v5.lib.strategy import MVOMomentumRebalance
+
+strategy = MVOMomentumRebalance(
+    lookback_days=20,       # Period for momentum calculation
+    risk_aversion=1.0,      # λ coefficient (higher = more conservative)
+    max_weight=0.3,         # Max 30% per asset (concentration limit)
+    use_shrinkage=True      # Ledoit-Wolf covariance shrinkage
+)
+portfolio = Portfolio(
+    name='MVO Momentum',
+    instruments=['AAPL', 'TSLA', 'NVDA', 'META', 'BRK-B'],
+    initial_capital=100_000,
+    strategy=strategy,
+    rebalance_freq=RebalanceFrequency.MONTHLY,
+    rebalance_day=1
+)
+```
+
+### 4. **MVOMeanRevertRebalance** - `mvo_mean_revert.py`
+Mean-Variance Optimization with mean reversion signals.
+- Allocates more capital to assets below their historical mean (undervalued)
+- Expected to revert UP if trading below mean, DOWN if above mean
+- Uses deviation from mean as the expected return signal
+- Same MVO optimization framework as momentum strategy
+```python
+from strategy_v5.lib.strategy import MVOMeanRevertRebalance
+
+strategy = MVOMeanRevertRebalance(
+    lookback_days=20,        # Period for calculating mean    
+    risk_aversion=1.0,       # Risk aversion in MVO
+    max_weight=0.3,          # Max 30% per asset
+    use_shrinkage=True       # Ledoit-Wolf shrinkage
+)
+portfolio = Portfolio(
+    name='MVO Mean Reversion',
+    instruments=['AAPL', 'TSLA', 'NVDA', 'META', 'BRK-B'],
+    initial_capital=100_000,
+    strategy=strategy,
+    rebalance_freq=RebalanceFrequency.MONTHLY,
+    rebalance_day=1
+)
+```
 
 ### 2. **portfolio.py** - Portfolio Management
 
@@ -193,62 +278,99 @@ evaluator.plot_comparison()
 ## Complete Workflow Example
 
 ```python
-from strategy_v5.lib.strategy.weight import WeightRebalance
-from strategy_v5.lib.strategy import RebalanceFrequency
-from strategy_v5.lib.portfolio import Portfolio
+from strategy_v5.lib.strategy import (
+    WeightRebalance, 
+    BuyAndHoldRebalance, 
+    MVOMomentumRebalance, 
+    MVOMeanRevertRebalance
+)
+from strategy_v5.lib.portfolio import Portfolio, RebalanceFrequency
 from strategy_v5.lib.executor import Executor
 from strategy_v5.lib.evaluator import PortfolioEvaluator
-from strategy_v5.lib.strategy.momentum import MomentumRebalance
+from datetime import datetime
+from pandas.tseries.offsets import BDay
 import pandas as pd
 
-# 1. Define strategies
-strategy_equal = WeightRebalance()
-strategy_momentum = MomentumRebalance()
+# Define instruments and dates
+instruments = ['META', 'TSLA', 'NVDA', 'AAPL', 'BRK-B', 'SPY', 'QQQ']
+initial_capital = 100_000
+end_date = datetime.today() - BDay(1)
+start_date = end_date - BDay(250)
 
-# 2. Create portfolios
-portfolio_equal = Portfolio(
-    instruments=['AAPL', 'NVDA', 'MSFT', 'TSLA', 'META'],
-    initial_capital=100_000,
-    strategy=strategy_equal,
-    rebalance_freq=RebalanceFrequency.MONTHLY,
-    rebalance_day=1,
-    name="Equal Weight"
-)
+# Create multiple portfolios with different strategies
+portfolios = [
+    Portfolio(
+        name='EQUAL WEIGHT',
+        instruments=instruments,
+        initial_capital=initial_capital,
+        strategy=WeightRebalance(),
+        rebalance_freq=RebalanceFrequency.MONTHLY,
+        rebalance_day=1
+    ),
+    
+    Portfolio(
+        name='BUY & HOLD',
+        instruments=instruments,
+        initial_capital=initial_capital,
+        strategy=BuyAndHoldRebalance(),
+        rebalance_freq=RebalanceFrequency.MONTHLY,
+        rebalance_day=1
+    ),
+    
+    Portfolio(
+        name='MVO MOMENTUM',
+        instruments=instruments,
+        initial_capital=initial_capital,
+        strategy=MVOMomentumRebalance(
+            lookback_days=20, 
+            max_weight=0.3, 
+            risk_aversion=1, 
+            use_shrinkage=True
+        ),
+        rebalance_freq=RebalanceFrequency.MONTHLY,
+        rebalance_day=1
+    ),
+    
+    Portfolio(
+        name='MVO MEAN REVERSION',
+        instruments=instruments,
+        initial_capital=initial_capital,
+        strategy=MVOMeanRevertRebalance(
+            lookback_days=20, 
+            max_weight=0.3, 
+            risk_aversion=1, 
+            use_shrinkage=True
+        ),
+        rebalance_freq=RebalanceFrequency.MONTHLY,
+        rebalance_day=1
+    ),
+    
+    Portfolio(
+        name='SPY Benchmark',
+        instruments=['SPY'],
+        initial_capital=initial_capital,
+        strategy=BuyAndHoldRebalance()
+    )
+]
 
-portfolio_momentum = Portfolio(
-    instruments=['AAPL', 'NVDA', 'MSFT', 'TSLA', 'META'],
-    initial_capital=100_000,
-    strategy=strategy_momentum,
-    rebalance_freq=RebalanceFrequency.MONTHLY,
-    rebalance_day=1,
-    name="Momentum"
-)
+# Execute backtests
+for portfolio in portfolios:
+    Executor(portfolio).run(start_date, end_date, verbose=False)
 
-# 3. Run backtests
-executor_equal = Executor(portfolio_equal)
-executor_equal.run(
-    start_date=pd.Timestamp('2024-01-01'),
-    end_date=pd.Timestamp('2025-12-31'),
-    verbose=True
-)
+# Evaluate and compare
+evaluator = PortfolioEvaluator(portfolios)
+metrics = evaluator.calculate_all_metrics()
 
-executor_momentum = Executor(portfolio_momentum)
-executor_momentum.run(
-    start_date=pd.Timestamp('2024-01-01'),
-    end_date=pd.Timestamp('2025-12-31'),
-    verbose=True
-)
-
-# 4. Evaluate and compare
-evaluator = PortfolioEvaluator([portfolio_equal, portfolio_momentum])
+# Display results
 evaluator.print_comparison()
-evaluator.plot_comparison(show_rebalance_markers=True)
+evaluator.plot_comparison(figsize=(14, 10), show_rebalance_markers=False)
 
-# 5. Access detailed results
-print(portfolio_equal.portfolio_values_history)  # Portfolio values over time
-print(portfolio_equal.positions_history)         # Share holdings over time
-print(portfolio_equal.weights_history)           # Portfolio weights over time
-print(portfolio_equal.history['rebalance_events'])  # All rebalance events
+# Access detailed results
+for portfolio in portfolios:
+    print(f"\n{portfolio.name}:")
+    print(f"  Final Value: ${portfolio.portfolio_values_history.iloc[-1]:,.0f}")
+    print(f"  Total Return: {(portfolio.portfolio_values_history.iloc[-1] / portfolio.initial_capital - 1) * 100:.2f}%")
+    print(f"  Number of Rebalances: {len(portfolio.history['rebalance_events'])}")
 ```
 
 ## Key Features
@@ -274,14 +396,15 @@ strategy_v5/
 │   ├── strategy/
 │   │   ├── __init__.py               # Strategy exports
 │   │   ├── strategy.py               # Base Strategy class & RebalanceFrequency enum
+│   │   ├── buy_and_hold.py           # Buy and hold (no rebalancing)
 │   │   ├── weight.py                 # Equal-weight rebalancing
-│   │   ├── momentum.py               # Momentum-based strategy
-│   │   ├── buy_and_hold.py           # Buy and hold strategy
-│   │   └── mvo_momentum.py           # MVO with momentum
+│   │   ├── mvo_momentum.py           # MVO with momentum signals
+│   │   └── mvo_mean_revert.py        # MVO with mean reversion signals
 │   ├── portfolio.py                  # Portfolio management & state tracking
 │   ├── executor.py                   # Backtest execution engine
 │   └── evaluator.py                  # Performance metrics & visualization
-├── Portfolio Optimization - Mean Reversion.ipynb  # Example notebook
+├── Portfolio Optimization - Framework.ipynb  # Complete backtest example
+├── Portfolio Optimization - Mean Reversion.ipynb  # Mean reversion research
 └── Readme.md                          # This file
 ```
 

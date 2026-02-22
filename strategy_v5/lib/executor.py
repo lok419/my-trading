@@ -9,6 +9,7 @@ import pandas as pd
 from strategy_v5.lib.portfolio import Portfolio
 from utils.data import get_yahoo_data_formatted
 from pandas.tseries.offsets import BDay
+from utils.logging import get_logger
 
 class Executor:
     """
@@ -33,8 +34,12 @@ class Executor:
         """
         self.portfolio = portfolio
         self.df_ohlc = None
+
+        # this define the lookback period for fetching data to ensure we have enough history for the first rebalance
+        self.lookback = self.portfolio.strategy.lookback_days * 2 if hasattr(self.portfolio.strategy, 'lookback_days') else 120
+        self.logger = get_logger(f"Executor-{self.portfolio.name}")
     
-    def fetch_data(self, start_date: pd.Timestamp, end_date: pd.Timestamp, lookback=120) -> pd.DataFrame:
+    def fetch_data(self, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.DataFrame:
         """
         Fetch OHLC data for all instruments using Yahoo Finance.
         
@@ -53,7 +58,7 @@ class Executor:
         """
         self.df_ohlc = get_yahoo_data_formatted(
             instruments=self.portfolio.instruments,
-            start_date=start_date - BDay(lookback),  # Fetch extra data for lookback period
+            start_date=start_date - BDay(self.lookback),  # Fetch extra data for lookback period
             end_date=end_date
         )
 

@@ -89,11 +89,7 @@ class Portfolio:
             'portfolio_values': [],
             'capitals': [],
             'rebalance_events': []
-        }
-        
-        # Results (populated by Executor)
-        self.positions_df = None
-        self.values_series = None
+        }                
     
     def should_rebalance(self, current_date: pd.Timestamp, last_rebalance_date: pd.Timestamp = None) -> bool:
         """
@@ -208,7 +204,10 @@ class Portfolio:
             'old_weights': old_weights,
             'new_weights': self.current_weights,
             'prices': current_prices.copy(),
-            'strategy': self.strategy.name
+            'strategy': self.strategy.name,
+            'turnover_mv': np.sum(np.abs(target_positions - old_positions) * current_prices) if last_rebal else 0,
+            'buy_mv': np.sum(np.maximum(target_positions - old_positions, 0) * current_prices) if last_rebal else 0,
+            'sell_mv': np.sum(np.maximum(old_positions - target_positions, 0) * current_prices) if last_rebal else 0,
         }        
         self.history['rebalance_events'].append(rebal_event)                
         return True

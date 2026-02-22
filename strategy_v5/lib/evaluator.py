@@ -285,7 +285,7 @@ class PortfolioEvaluator:
             metrics = {
                 'Strategy': portfolio.name,
                 'Initial Capital': f"${initial:,.0f}",
-                'Final Value': f"${final:,.2f}",
+                'Final Value': f"${final:,.0f}",
                 'Total Return %': f"{PerformanceMetrics.total_return(initial, final):.2f}%",
                 'Ann. Return %': f"{PerformanceMetrics.annualized_return(values):.2f}%",
                 'Ann. Volatility %': f"{PerformanceMetrics.annualized_volatility(values):.2f}%",
@@ -296,21 +296,84 @@ class PortfolioEvaluator:
                 'Max Drawdown %': f"{PerformanceMetrics.max_drawdown(values):.2f}%",
                 'Calmar Ratio': f"{PerformanceMetrics.calmar_ratio(values):.3f}",
                 'Num Rebalances': len(portfolio.history['rebalance_events']),
+                'Avg Turnover $': f"${np.mean([event['turnover_mv'] for event in portfolio.history['rebalance_events']]):,.0f}",                
+                'Total Turnover $': f"${np.sum([event['turnover_mv'] for event in portfolio.history['rebalance_events']]):,.0f}",                
                 'Trading Days': len(values)
             }
             metrics_list.append(metrics)
-        
-        self.metrics_df = pd.DataFrame(metrics_list)
+                
+        self.metrics_df = pd.DataFrame(metrics_list)        
+        self.metrics_df.columns = pd.MultiIndex.from_tuples([            
+            ('', 'Strategy'),
+            ('Performance', 'Initial Capital'),
+            ('Performance', 'Final Value'),
+            ('Performance', 'Total Return %'),
+            ('Performance', 'Ann. Return %'),
+            ('Performance', 'Ann. Volatility %'),
+            ('Performance', 'Return %'),
+            ('Performance', 'Max Return %'),
+            ('Performance', 'Min Return %'),
+            ('Risk-Adjusted', 'Sharpe Ratio'),
+            ('Risk-Adjusted', 'Max Drawdown %'),
+            ('Risk-Adjusted', 'Calmar Ratio'),
+            ('Rebalance', 'Num Rebalances'),
+            ('Rebalance', 'Avg Turnover $'),
+            ('Rebalance', 'Total Turnover $'),
+            ('Rebalance', 'Trading Days'),
+        ])
+
         return self.metrics_df
     
-    def print_comparison(self):
+    def print_comparison(self, format=True):
         """
-        Print comparison table of all portfolios.
+        Print comparison table of all portfolios with styling.
+        Displays a formatted HTML table with grouped columns.
         """
         if self.metrics_df is None:
             self.calculate_all_metrics()
-            
-        display(self.metrics_df)        
+        
+        # Apply styling for display
+        if format:
+            style = self.metrics_df.style.set_caption("Portfolio Performance Comparison").set_table_styles([
+                {'selector': 'caption', 'props': [('font-size', '16px'), ('font-weight', 'bold'), ('color', '#e0e0e0'), ('caption-side', 'top'), ('padding', '10px')]},
+                {'selector': 'th', 'props': [('background-color', '#2d2d2d'), ('color', '#e0e0e0'), ('font-size', '12px'), ('border', '1px solid #444'), ('text-align', 'center'), ('vertical-align', 'middle')]},
+                {'selector': 'td', 'props': [('padding', '8px'), ('text-align', 'center'), ('font-size', '12px'), ('border', '1px solid #444'), ('color', '#e0e0e0')]},
+                {'selector': 'tr:nth-child(even)', 'props': [('background-color', '#1e1e1e')]},
+            ])
+        else:
+            style = self.metrics_df.style
+        
+        display(style)        
+    
+    def _mark_rebalance_events(self, ax: plt.Axes, portfolio: Portfolio, data_series: pd.Series, color: str) -> None:
+        """
+        Mark rebalance events on a plot with scatter markers.
+        
+        Parameters:
+        -----------
+        ax : plt.Axes
+            Matplotlib axis to draw on
+        
+        portfolio : Portfolio
+            Portfolio object containing rebalance events
+        
+        data_series : pd.Series
+            Data series being plotted (portfolio values, returns, volatility, etc.)
+        
+        color : str
+            Color for the scatter markers (should match the line color)
+        """
+        rebal_dates = []
+        rebal_values = []
+        
+        for rebal_event in portfolio.history['rebalance_events']:
+            rebal_date = rebal_event['date']
+            if rebal_date in data_series.index:
+                rebal_dates.append(rebal_date)
+                rebal_values.append(data_series[rebal_date])
+        
+        if rebal_dates:
+            ax.scatter(rebal_dates, rebal_values, marker='o', s=25, color=color, linewidths=1.5, zorder=5)
     
     def plot_comparison(self, figsize: tuple = (14, 8), show_rebalance_markers: bool = False):
         """
@@ -332,6 +395,7 @@ class PortfolioEvaluator:
             Whether to show rebalance event markers on plots. Default is False.
         """
         fig, axes = plt.subplots(2, 2, figsize=figsize)
+        axes = axes.flatten()
         
         # Get default matplotlib colors (blue, orange, green, red, purple, etc.)
         # Cycle colors if we have more portfolios than default colors
@@ -340,21 +404,12 @@ class PortfolioEvaluator:
         colors = [colors[i % len(colors)] for i in range(len(self.portfolios))]
         
         # Plot 1: Portfolio values over time
-        ax = axes[0, 0]
+        ax = axes[0]
         for idx, portfolio in enumerate(self.portfolios):            
             ax.plot(portfolio.portfolio_values_history.index, portfolio.portfolio_values_history.values, label=portfolio.name, linewidth=2, color=colors[idx])
             
-            # Mark rebalance events on this plot with 'x' markers
             if show_rebalance_markers:
-                rebal_dates = []
-                rebal_values = []
-                for rebal_event in portfolio.history['rebalance_events']:
-                    rebal_date = rebal_event['date']
-                    if rebal_date in portfolio.portfolio_values_history.index:
-                        rebal_dates.append(rebal_date)
-                        rebal_values.append(portfolio.portfolio_values_history[rebal_date])
-                if rebal_dates:
-                    ax.scatter(rebal_dates, rebal_values, marker='o', s=25, color=colors[idx], linewidths=1.5, zorder=5)
+                self._mark_rebalance_events(ax, portfolio, portfolio.portfolio_values_history, colors[idx])
 
         ax.set_title('Portfolio Value Over Time', fontsize=12, fontweight='bold')
         ax.set_ylabel('Portfolio Value ($)', fontsize=11)
@@ -362,73 +417,45 @@ class PortfolioEvaluator:
         ax.grid(True, alpha=0.3)
         ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1000:.0f}K'))
         
-        # Plot 2: Cumulative Returns
-        ax = axes[0, 1]
-        for idx, portfolio in enumerate(self.portfolios):            
-            cum_ret = ((portfolio.portfolio_values_history / portfolio.initial_capital) - 1) * 100
+        # Plot 2: Cumulative Log Returns
+        ax = axes[1]
+        for idx, portfolio in enumerate(self.portfolios):                        
+            cum_ret = np.log(portfolio.portfolio_values_history.pct_change().add(1)).cumsum() * 100
             ax.plot(cum_ret.index, cum_ret.values, label=portfolio.name, linewidth=2, color=colors[idx])
             
-            # Mark rebalance events on this plot with 'x' markers
             if show_rebalance_markers:
-                rebal_dates = []
-                rebal_values = []
-                for rebal_event in portfolio.history['rebalance_events']:
-                    rebal_date = rebal_event['date']
-                    if rebal_date in cum_ret.index:
-                        rebal_dates.append(rebal_date)
-                        rebal_values.append(cum_ret[rebal_date])
-                if rebal_dates:
-                    ax.scatter(rebal_dates, rebal_values, marker='o', s=25, color=colors[idx], linewidths=1.5, zorder=5)
+                self._mark_rebalance_events(ax, portfolio, cum_ret, colors[idx])
 
-        ax.set_title('Cumulative Returns %', fontsize=12, fontweight='bold')
+        ax.set_title('Cumulative Log Returns %', fontsize=12, fontweight='bold')
         ax.set_ylabel('Return %', fontsize=11)
         ax.legend()
         ax.grid(True, alpha=0.3)
         
         # Plot 3: 20-day rolling annualized volatility
-        ax = axes[1, 0]
+        ax = axes[2]
         for idx, portfolio in enumerate(self.portfolios):
             daily_ret = portfolio.portfolio_values_history.pct_change().dropna()
-            rolling_vol = daily_ret.rolling(window=20).std() * np.sqrt(252) * 100  # Annualized vol in %
+            rolling_vol = daily_ret.rolling(window=20, min_periods=1).std() * np.sqrt(252) * 100  # Annualized vol in %
             ax.plot(rolling_vol.index, rolling_vol.values, label=portfolio.name, linewidth=2, color=colors[idx])
             
-            # Mark rebalance events on this plot with 'x' markers
             if show_rebalance_markers:
-                rebal_dates = []
-                rebal_values = []
-                for rebal_event in portfolio.history['rebalance_events']:
-                    rebal_date = rebal_event['date']
-                    if rebal_date in rolling_vol.index:
-                        rebal_dates.append(rebal_date)
-                        rebal_values.append(rolling_vol[rebal_date])
-                if rebal_dates:
-                    ax.scatter(rebal_dates, rebal_values, marker='o', s=25, color=colors[idx], linewidths=1.5, zorder=5)
+                self._mark_rebalance_events(ax, portfolio, rolling_vol, colors[idx])
         
         ax.set_title('20-Day Rolling Annualized Volatility', fontsize=12, fontweight='bold')
         ax.set_ylabel('Volatility (%)', fontsize=11)
         ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.xaxis.set_major_locator(plt.matplotlib.dates.MonthLocator(interval=2))
+        ax.grid(True, alpha=0.3)        
         
         # Plot 4: Drawdown
-        ax = axes[1, 1]
+        ax = axes[3]
         for idx, portfolio in enumerate(self.portfolios):
             values = portfolio.portfolio_values_history
             cummax = values.cummax()
             drawdown = ((values - cummax) / cummax) * 100
             ax.plot(drawdown.index, drawdown.values, label=portfolio.name, linewidth=2, color=colors[idx])
             
-            # Mark rebalance events on this plot with 'x' markers
             if show_rebalance_markers:
-                rebal_dates = []
-                rebal_values = []
-                for rebal_event in portfolio.history['rebalance_events']:
-                    rebal_date = rebal_event['date']
-                    if rebal_date in drawdown.index:
-                        rebal_dates.append(rebal_date)
-                        rebal_values.append(drawdown[rebal_date])
-                if rebal_dates:
-                    ax.scatter(rebal_dates, rebal_values, marker='o', s=25, color=colors[idx], linewidths=1.5, zorder=5)
+                self._mark_rebalance_events(ax, portfolio, drawdown, colors[idx])
         
         ax.set_title('Drawdown Over Time', fontsize=12, fontweight='bold')
         ax.set_ylabel('Drawdown %', fontsize=11)
