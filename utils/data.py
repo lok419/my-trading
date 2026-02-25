@@ -99,19 +99,34 @@ def get_yahoo_data(*args, **kwargs):
     '''    
     return yf.download(*args, **kwargs)
 
-def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_date: datetime) -> DataFrame:
+def get_yahoo_data_formatted(instruments: list[str], start_date: datetime = None, end_date: datetime = None, 
+                             interval: str = "1d", period: str = None, use_cache: bool = True) -> DataFrame:
     '''
         Get Yahoo price data. Also reformat the data to mulitindex when there is only one instrument
         Args:
             instruments (list[str]): List of tickers
-            start_date (datetime): Start date
-            end_date (datetime): End date
-            add_cash (bool, optional): Add cash to the data. Defaults to False.
+            start_date (datetime): Start date (used if period is None)
+            end_date (datetime): End date (used if period is None)
+            interval (str): Interval for data fetch ('1d', '15m', '1h', etc.). Default: '1d'
+            period (str): Period for data fetch ('1d', '5d', '1mo', etc.). Default: None (uses start_date/end_date)
+            use_cache (bool): Whether to use cached data. Default: True. Set to False for real-time data like intraday prices.
     '''
     instruments_wo_cash = [instrument for instrument in instruments if instrument != 'CASH']
 
-    # Bug from yahoo API, it doesn't include price at end_date            
-    px = get_yahoo_data(tickers=tuple(instruments_wo_cash), interval="1d",auto_adjust=True, start=start_date, end=add_bday(end_date, 10))
+    # Choose download function based on cache preference
+    download_func = get_yahoo_data if use_cache else yf.download
+    
+    # Build kwargs for download
+    kwargs = {'tickers': tuple(instruments_wo_cash), 'interval': interval, 'auto_adjust': True}
+    
+    # Add period or date range
+    if period:
+        kwargs['period'] = period
+    else:
+        kwargs['start'] = start_date
+        kwargs['end'] = add_bday(end_date, 10)
+    
+    px = download_func(**kwargs)
     px = px.copy()    
 
     # add cash separately
@@ -119,7 +134,10 @@ def get_yahoo_data_formatted(instruments: list[str], start_date: datetime, end_d
         for col in px.columns.get_level_values(0).unique():
             px.loc[:, (col, 'CASH')] = 1
 
-    px = px[start_date: end_date]    
+    # Filter by date range if provided
+    if start_date and end_date:
+        px = px[start_date: end_date]
+    
     px = px.reindex(columns=pd.MultiIndex.from_product(
         [px.columns.get_level_values(0).unique(), instruments_wo_cash + (['CASH'] if 'CASH' in instruments else [])],
         names=px.columns.names
