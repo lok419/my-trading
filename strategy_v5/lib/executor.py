@@ -247,9 +247,10 @@ class Executor:
         self.logger.info(f"\nExecuting live orders - {date.date()}")
         market = TrdMarket.US
         
-        if not force and not self.portfolio.should_rebalance(date):
-            self.logger.info(f"No rebalance scheduled for {date.date()}")
-            return pd.DataFrame()
+        # for now the executor don't handle the rebalance frequency, completely depends on users to call the execute function at the right time.
+        # if not force and not self.portfolio.should_rebalance(date):
+        #     self.logger.info(f"No rebalance scheduled for {date.date()}")
+        #     return pd.DataFrame()
         
         futu_account = Futu()
         
@@ -290,7 +291,13 @@ class Executor:
         df_rebal['price'] = df_rebal.index.map(price_last)        
 
         # Display rebalance summary
-        self._display_rebalance_summary(df_rebal)        
+        self._display_rebalance_summary(df_rebal)
+        
+        # Prompt user for confirmation
+        user_input = input("\nProceed with execution? (Y/N): ").strip().upper()
+        if user_input != 'Y':
+            self.logger.info("Execution cancelled by user")
+            return pd.DataFrame()
         
         # Cancel all existing orders before executing
         self.logger.info("Cancelling all existing orders")

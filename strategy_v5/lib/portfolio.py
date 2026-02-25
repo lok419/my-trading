@@ -9,8 +9,12 @@ import pandas as pd
 from strategy_v5.lib.strategy import Strategy
 from enum import Enum
 
+
 class RebalanceFrequency(Enum):
-    """Enum for rebalance frequencies"""
+    """
+        Enum for rebalance frequencies
+        The rebalance freq only determines the backtest rebalancing logic, the live execution is completely depends on users to call the execute function at the right time.
+    """    
     DAILY = 'D'
     WEEKLY = 'W'
     BI_WEEKLY = 'BW'
@@ -180,8 +184,8 @@ class Portfolio:
         last_rebal = self.history['rebalance_events'][-1]['date'] if self.history['rebalance_events'] else None
         self.ohlc = kwargs.get('ohlc', None)
         
-        if not force and not self.should_rebalance(current_date, last_rebal):
-            return False
+        # if not force and not self.should_rebalance(current_date, last_rebal):
+        #     return False
         
         # Calculate current portfolio value
         if self.current_portfolio_value is None:
