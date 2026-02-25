@@ -72,16 +72,26 @@ class Portfolio:
         self.strategy = strategy
         self.rebalance_freq = rebalance_freq
         self.rebalance_day = rebalance_day
-        
-        # Current state
-        self.current_positions = np.zeros(self.n_assets)  # shares held
-        self.current_weights = np.zeros(self.n_assets)  # weights of each asset in portfolio
-        self.current_capital = initial_capital
-        self.current_portfolio_value = None
-        self.current_date = None
         self.name = name if name else strategy.name
         
-        # Historical tracking
+        # Reset Current state
+        self.reset()        
+    
+    def reset(self):
+        """
+        Reset portfolio to initial state.
+        
+        Clears all current positions, weights, capital, and historical tracking.
+        Useful for running multiple backtests with the same portfolio configuration.
+        """
+        # Reset current state
+        self.current_positions = np.zeros(self.n_assets)
+        self.current_weights = np.zeros(self.n_assets)
+        self.current_capital = self.initial_capital
+        self.current_portfolio_value = None
+        self.current_date = None
+        
+        # Reset history
         self.history = {
             'dates': [],
             'positions': [],
@@ -89,7 +99,7 @@ class Portfolio:
             'portfolio_values': [],
             'capitals': [],
             'rebalance_events': []
-        }                
+        }  
     
     def should_rebalance(self, current_date: pd.Timestamp, last_rebalance_date: pd.Timestamp = None) -> bool:
         """
