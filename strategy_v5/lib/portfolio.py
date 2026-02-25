@@ -184,8 +184,8 @@ class Portfolio:
         last_rebal = self.history['rebalance_events'][-1]['date'] if self.history['rebalance_events'] else None
         self.ohlc = kwargs.get('ohlc', None)
         
-        # if not force and not self.should_rebalance(current_date, last_rebal):
-        #     return False
+        if not force and not self.should_rebalance(current_date, last_rebal):
+            return False
         
         # Calculate current portfolio value
         if self.current_portfolio_value is None:
