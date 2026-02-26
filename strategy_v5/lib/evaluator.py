@@ -384,95 +384,242 @@ class PortfolioEvaluator:
     
     def plot_comparison(self, figsize: tuple = (14, 8), show_rebalance_markers: bool = False):
         """
-        Plot comparison of multiple portfolios.
+        Plot comparison of multiple portfolios using Plotly (interactive).
         
-        Creates 4 subplots:
+        Creates 4 subplots (2x2 grid):
         1. Portfolio values over time
         2. Cumulative returns %
         3. 20-day rolling annualized volatility
         4. Drawdown over time
         
-        Rebalance events are marked with 'x' markers using the same color as the strategy line (if show_rebalance_markers=True).
+        Rebalance events are marked with circle markers using the same color as the strategy line (if show_rebalance_markers=True).
         
         Parameters:
         -----------
         figsize : tuple
-            Figure size (width, height)
+            Figure size (width, height) - used to scale Plotly figure dimensions
         show_rebalance_markers : bool
             Whether to show rebalance event markers on plots. Default is False.
         """
-        fig, axes = plt.subplots(2, 2, figsize=figsize)
-        axes = axes.flatten()
+        # Create 2x2 subplot grid with reduced spacing
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                'Portfolio Value Over Time',
+                'Cumulative Log Returns %',
+                '20-Day Rolling Annualized Volatility',
+                'Drawdown Over Time'
+            ),
+            specs=[[{'secondary_y': False}, {'secondary_y': False}],
+                   [{'secondary_y': False}, {'secondary_y': False}]],
+            vertical_spacing=0.12,
+            horizontal_spacing=0.12
+        )
         
-        # Get default matplotlib colors (blue, orange, green, red, purple, etc.)
-        # Cycle colors if we have more portfolios than default colors
-        prop_cycle = plt.rcParams['axes.prop_cycle']
-        colors = prop_cycle.by_key()['color']        
+        # Link all x-axes together for synchronized zooming
+        fig.update_xaxes(matches="x")
+        
+        # Get default plotly colors
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
         colors = [colors[i % len(colors)] for i in range(len(self.portfolios))]
         
         # Plot 1: Portfolio values over time
-        ax = axes[0]
-        for idx, portfolio in enumerate(self.portfolios):            
-            ax.plot(portfolio.portfolio_values_history.index, portfolio.portfolio_values_history.values, label=portfolio.name, linewidth=2, color=colors[idx])
+        for idx, portfolio in enumerate(self.portfolios):
+            fig.add_trace(
+                go.Scatter(
+                    x=portfolio.portfolio_values_history.index,
+                    y=portfolio.portfolio_values_history.values,
+                    mode='lines',
+                    name=portfolio.name,
+                    legendgroup=portfolio.name,
+                    line=dict(color=colors[idx], width=2),
+                    hovertemplate='%{fullData.name}: $%{y:,.0f}<extra></extra>'
+                ),
+                row=1, col=1
+            )
             
             if show_rebalance_markers:
-                self._mark_rebalance_events(ax, portfolio, portfolio.portfolio_values_history, colors[idx])
-
-        ax.set_title('Portfolio Value Over Time', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Portfolio Value ($)', fontsize=11)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x/1000:.0f}K'))
+                rebal_dates = []
+                rebal_values = []
+                for rebal_event in portfolio.history['rebalance_events']:
+                    rebal_date = rebal_event['date']
+                    if rebal_date in portfolio.portfolio_values_history.index:
+                        rebal_dates.append(rebal_date)
+                        rebal_values.append(portfolio.portfolio_values_history[rebal_date])
+                
+                if rebal_dates:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=rebal_dates,
+                            y=rebal_values,
+                            mode='markers',
+                            marker=dict(size=8, color=colors[idx], symbol='circle'),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ),
+                        row=1, col=1
+                    )
         
         # Plot 2: Cumulative Log Returns
-        ax = axes[1]
-        for idx, portfolio in enumerate(self.portfolios):                        
+        for idx, portfolio in enumerate(self.portfolios):
             cum_ret = np.log(portfolio.portfolio_values_history.pct_change().add(1)).cumsum() * 100
-            ax.plot(cum_ret.index, cum_ret.values, label=portfolio.name, linewidth=2, color=colors[idx])
+            fig.add_trace(
+                go.Scatter(
+                    x=cum_ret.index,
+                    y=cum_ret.values,
+                    mode='lines',
+                    name=portfolio.name,
+                    legendgroup=portfolio.name,
+                    line=dict(color=colors[idx], width=2),
+                    showlegend=False,
+                    hovertemplate='%{fullData.name}: %{y:.2f}%<extra></extra>'
+                ),
+                row=1, col=2
+            )
             
             if show_rebalance_markers:
-                self._mark_rebalance_events(ax, portfolio, cum_ret, colors[idx])
-
-        ax.set_title('Cumulative Log Returns %', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Return %', fontsize=11)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+                rebal_dates = []
+                rebal_values = []
+                for rebal_event in portfolio.history['rebalance_events']:
+                    rebal_date = rebal_event['date']
+                    if rebal_date in cum_ret.index:
+                        rebal_dates.append(rebal_date)
+                        rebal_values.append(cum_ret[rebal_date])
+                
+                if rebal_dates:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=rebal_dates,
+                            y=rebal_values,
+                            mode='markers',
+                            marker=dict(size=8, color=colors[idx], symbol='circle'),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ),
+                        row=1, col=2
+                    )
         
         # Plot 3: 20-day rolling annualized volatility
-        ax = axes[2]
         for idx, portfolio in enumerate(self.portfolios):
             daily_ret = portfolio.portfolio_values_history.pct_change().dropna()
-            rolling_vol = daily_ret.rolling(window=20, min_periods=1).std() * np.sqrt(252) * 100  # Annualized vol in %
-            ax.plot(rolling_vol.index, rolling_vol.values, label=portfolio.name, linewidth=2, color=colors[idx])
+            rolling_vol = daily_ret.rolling(window=20, min_periods=1).std() * np.sqrt(252) * 100
+            fig.add_trace(
+                go.Scatter(
+                    x=rolling_vol.index,
+                    y=rolling_vol.values,
+                    mode='lines',
+                    name=portfolio.name,
+                    legendgroup=portfolio.name,
+                    line=dict(color=colors[idx], width=2),
+                    showlegend=False,
+                    hovertemplate='%{fullData.name}: %{y:.2f}%<extra></extra>'
+                ),
+                row=2, col=1
+            )
             
             if show_rebalance_markers:
-                self._mark_rebalance_events(ax, portfolio, rolling_vol, colors[idx])
-        
-        ax.set_title('20-Day Rolling Annualized Volatility', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Volatility (%)', fontsize=11)
-        ax.legend()
-        ax.grid(True, alpha=0.3)        
+                rebal_dates = []
+                rebal_values = []
+                for rebal_event in portfolio.history['rebalance_events']:
+                    rebal_date = rebal_event['date']
+                    if rebal_date in rolling_vol.index:
+                        rebal_dates.append(rebal_date)
+                        rebal_values.append(rolling_vol[rebal_date])
+                
+                if rebal_dates:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=rebal_dates,
+                            y=rebal_values,
+                            mode='markers',
+                            marker=dict(size=8, color=colors[idx], symbol='circle'),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ),
+                        row=2, col=1
+                    )
         
         # Plot 4: Drawdown
-        ax = axes[3]
         for idx, portfolio in enumerate(self.portfolios):
             values = portfolio.portfolio_values_history
             cummax = values.cummax()
             drawdown = ((values - cummax) / cummax) * 100
-            ax.plot(drawdown.index, drawdown.values, label=portfolio.name, linewidth=2, color=colors[idx])
+            fig.add_trace(
+                go.Scatter(
+                    x=drawdown.index,
+                    y=drawdown.values,
+                    mode='lines',
+                    name=portfolio.name,
+                    legendgroup=portfolio.name,
+                    line=dict(color=colors[idx], width=2),
+                    showlegend=False,
+                    hovertemplate='%{fullData.name}: %{y:.2f}%<extra></extra>'
+                ),
+                row=2, col=2
+            )
             
             if show_rebalance_markers:
-                self._mark_rebalance_events(ax, portfolio, drawdown, colors[idx])
+                rebal_dates = []
+                rebal_values = []
+                for rebal_event in portfolio.history['rebalance_events']:
+                    rebal_date = rebal_event['date']
+                    if rebal_date in drawdown.index:
+                        rebal_dates.append(rebal_date)
+                        rebal_values.append(drawdown[rebal_date])
+                
+                if rebal_dates:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=rebal_dates,
+                            y=rebal_values,
+                            mode='markers',
+                            marker=dict(size=8, color=colors[idx], symbol='circle'),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ),
+                        row=2, col=2
+                    )
         
-        ax.set_title('Drawdown Over Time', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Drawdown %', fontsize=11)
-        ax.set_xlabel('Date', fontsize=11)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.axhline(0, color='black', linestyle='-', linewidth=0.8)
+        # Add zero line to drawdown plot
+        fig.add_hline(y=0, line_dash='dash', line_color='gray', row=2, col=2, annotation_text='')
         
-        plt.tight_layout()
-        plt.show()
+        # Update layout
+        fig.update_xaxes(title_text='Date', row=1, col=1, showticklabels=True)
+        fig.update_xaxes(title_text='Date', row=1, col=2, showticklabels=True)
+        fig.update_xaxes(title_text='Date', row=2, col=1)
+        fig.update_xaxes(title_text='Date', row=2, col=2)
+        
+        fig.update_yaxes(title_text='Portfolio Value ($)', row=1, col=1)
+        fig.update_yaxes(title_text='Return %', row=1, col=2)
+        fig.update_yaxes(title_text='Volatility (%)', row=2, col=1)
+        fig.update_yaxes(title_text='Drawdown %', row=2, col=2)
+        
+        # Format y-axis for portfolio values
+        fig.update_yaxes(tickformat='$,.0f', row=1, col=1)
+        
+        # Calculate figure dimensions from figsize
+        width = int(figsize[0] * 100)
+        height = int(figsize[1] * 100)
+        
+        fig.update_layout(
+            title_text='Portfolio Comparison',
+            height=height,
+            width=width,
+            hovermode='x unified',
+            template='plotly_white',
+            legend=dict(
+                x=1.02,
+                y=0.99,
+                xanchor='left',
+                yanchor='top',
+                bgcolor='rgba(255, 255, 255, 0.8)',
+                bordercolor='gray',
+                borderwidth=1
+            ),
+            showlegend=True
+        )
+        
+        fig.show()
     
     def plot_weights_history(self, portfolio_idx: int = 0, portfolio_name: str = None):
         """
@@ -524,6 +671,9 @@ class PortfolioEvaluator:
             specs=[[{'secondary_y': False}, {'secondary_y': False}]]
         )
         
+        # Link x-axes for synchronized zooming
+        fig.update_xaxes(matches="x")
+        
         # Add line chart traces
         for asset in weights_df.columns:
             fig.add_trace(
@@ -532,6 +682,7 @@ class PortfolioEvaluator:
                     y=weights_df[asset],
                     mode='lines',
                     name=asset,
+                    legendgroup=asset,
                     hovertemplate='%{fullData.name}: %{y:.2%}<extra></extra>',
                     line=dict(width=2),
                     showlegend=True
@@ -547,8 +698,8 @@ class PortfolioEvaluator:
                     y=weights_df[asset],
                     mode='lines',
                     name=asset,
+                    legendgroup=asset,
                     stackgroup='one',
-                    fillcolor=None,
                     hovertemplate='%{fullData.name}: %{y:.2%}<extra></extra>',
                     showlegend=False
                 ),
@@ -563,10 +714,10 @@ class PortfolioEvaluator:
             hovermode='x unified',
             template='plotly_white',
             legend=dict(
-                yanchor='top',
+                x=1.02,
                 y=0.99,
                 xanchor='left',
-                x=0.01,
+                yanchor='top',
                 bgcolor='rgba(255, 255, 255, 0.8)',
                 bordercolor='gray',
                 borderwidth=1
@@ -574,8 +725,8 @@ class PortfolioEvaluator:
         )
         
         # Update axes
-        fig.update_xaxes(title_text='Date', row=1, col=1)
-        fig.update_xaxes(title_text='Date', row=1, col=2)
+        fig.update_xaxes(title_text='Date', row=1, col=1, showticklabels=True)
+        fig.update_xaxes(title_text='Date', row=1, col=2, showticklabels=True)
         fig.update_yaxes(title_text='Weight (%)', tickformat='.0%', range=[0, 1], row=1, col=1)
         fig.update_yaxes(title_text='Weight (%)', tickformat='.0%', range=[0, 1], row=1, col=2)                 
         fig.show()
