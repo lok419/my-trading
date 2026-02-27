@@ -223,7 +223,7 @@ class Executor:
 
         display(style)
 
-    def execute(self, date: pd.Timestamp, is_live: bool = False, force: bool = False) -> pd.DataFrame:
+    def execute(self, date: pd.Timestamp, is_live: bool = False, force: bool = False, use_spot_mv: bool = False) -> pd.DataFrame:
         """
         Execute live trading orders via Futu broker.
         
@@ -235,6 +235,10 @@ class Executor:
             If True, execute real orders (TrdEnv.REAL). If False, simulate only (TrdEnv.SIMULATE).
         force : bool
             If True, force execution regardless of rebalance schedule
+        use_spot_mv : bool
+            If True, derive target shares based on current realized total MV from spot (Futu).
+            Target weights come from the strategy, quantities calculated from actual holdings.
+            Default is False (uses portfolio target positions).
         
         Returns:
         --------
@@ -254,12 +258,7 @@ class Executor:
         
         futu_account = Futu()
         
-        # Get target positions        
-        target = pd.DataFrame(self.portfolio.positions_history.loc[date]).drop('CASH', errors='ignore')
-        target.columns = ['target']
-        target = target[target['target'] > 0]
-        
-        # Get current positions from Futu (must have data)
+        # Get current positions from Futu
         current_data = futu_account.get_position(market=market)
         if current_data is None or current_data.empty:
             raise Exception("No positions returned from Futu API - possible connection issue")
@@ -267,28 +266,42 @@ class Executor:
         current = current_data.copy()
         current['instrument'] = current['code'].apply(lambda x: self._convert_ticker(x, to_futu=False))
         current = current[['instrument', 'qty']].set_index('instrument')
-        current.columns = ['current']        
+        current.columns = ['current']
         
-        # Calculate turnover (only for portfolio instruments)
+        # Get target from portfolio
+        target = pd.DataFrame(self.portfolio.positions_history.loc[date]).drop('CASH', errors='ignore')
+        target.columns = ['target']
+        target = target[target['target'] > 0]
+        
+        # Build rebalance dataframe
         df_rebal = target.join(current, how='left').fillna(0)
-        df_rebal['shares'] = (df_rebal['target'] - df_rebal['current']).astype(int)        
         
         if df_rebal.empty:
             self.logger.info("No trades needed")
             return pd.DataFrame()
         
-        # Get prices (15m interval for limit order pricing - real-time, no cache)
+        # Get prices for target instruments
         prices = get_yahoo_data_formatted(
             instruments=df_rebal.index.tolist(),
             interval='15m',
             period='1d',
             use_cache=False
         )
-        
-        # Forward fill prices to handle missing data in last 15m window
         prices = prices.ffill()
         price_last = prices['Close'].iloc[-1]
-        df_rebal['price'] = df_rebal.index.map(price_last)        
+        df_rebal['price'] = df_rebal.index.map(price_last)
+        
+        # Calculate target shares based on rebalance mode
+        if use_spot_mv:
+            # Derive target from weights and current spot MV
+            target_weights = pd.DataFrame(self.portfolio.weights_history.loc[date]).drop('CASH', errors='ignore')
+            target_weights.columns = ['target_weight']
+            target_weights = target_weights[target_weights['target_weight'] > 0]
+            
+            current_mv = (df_rebal['current'] * df_rebal['price']).sum()
+            df_rebal['target'] = np.floor(target_weights.loc[df_rebal.index, 'target_weight'] * current_mv / df_rebal['price']).fillna(0).astype(int)
+        
+        df_rebal['shares'] = (df_rebal['target'] - df_rebal['current']).astype(int)        
 
         # Display rebalance summary
         self._display_rebalance_summary(df_rebal)
