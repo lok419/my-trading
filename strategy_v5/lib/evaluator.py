@@ -664,6 +664,10 @@ class PortfolioEvaluator:
             print(f"Error: No weights history available for portfolio '{portfolio.name}'")
             return
         
+        # Create color map using Plotly's default colors
+        plotly_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52']
+        asset_colors = {asset: plotly_colors[idx % len(plotly_colors)] for idx, asset in enumerate(weights_df.columns)}
+        
         # Create figure(s) based on chart_type                
         fig = make_subplots(
             rows=1, cols=2,
@@ -684,7 +688,7 @@ class PortfolioEvaluator:
                     name=asset,
                     legendgroup=asset,
                     hovertemplate='%{fullData.name}: %{y:.2%}<extra></extra>',
-                    line=dict(width=2),
+                    line=dict(width=2, color=asset_colors[asset]),
                     showlegend=True
                 ),
                 row=1, col=1
@@ -692,6 +696,11 @@ class PortfolioEvaluator:
         
         # Add stacked area traces
         for asset in weights_df.columns:
+            # Convert hex to rgba with transparency
+            hex_color = asset_colors[asset]
+            rgb = tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))
+            rgba_color = f'rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.6)'
+            
             fig.add_trace(
                 go.Scatter(
                     x=weights_df.index,
@@ -700,6 +709,8 @@ class PortfolioEvaluator:
                     name=asset,
                     legendgroup=asset,
                     stackgroup='one',
+                    line=dict(width=0),
+                    fillcolor=rgba_color,
                     hovertemplate='%{fullData.name}: %{y:.2%}<extra></extra>',
                     showlegend=False
                 ),
